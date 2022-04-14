@@ -14,6 +14,22 @@ int testVal = 0;
 int delayTime = 100;
 unsigned long lastMillis = 0;
 
+void IRAM_ATTR Ext_INT1_ISR()
+{
+   uint8_t rotation = Encoder.read();
+  if (rotation) {
+    if (rotation == 16) {  // left
+      testVal--;
+      if (testVal < 0) testVal = 0;
+      printCenterTest(testVal);
+    } else if (rotation == 32) {  // right
+      testVal++;
+      if (testVal > 10) testVal = 10;
+      printCenterTest(testVal);
+    }
+  }
+}
+
 void setup() {
   //! Esto limita la frecuencia del CPU porque es demasiado rápido para medir los valores de la celda de carga
   // TODO Hay que buscar otra librería u otra solución porque esto no es ideal
@@ -29,22 +45,14 @@ void setup() {
   Load.tare();                // Asigna el valor del tare
   // Load.get_units(N_READINGS);  // Devuelve el valor del ADC convertido a gramos menos el valor del tare
   printCenterTest(testVal);
+
+  pinMode(EN_CLK, INPUT);
+  pinMode(EN_DT, INPUT);
+  attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
+  attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
 }
 
 void loop() {
-  uint8_t rotation = Encoder.read();
-  if (rotation) {
-    if (rotation == 16) {  // left
-      testVal--;
-      if (testVal < 0) testVal = 0;
-      printCenterTest(testVal);
-    } else if (rotation == 32) {  // right
-      testVal++;
-      if (testVal > 10) testVal = 10;
-      printCenterTest(testVal);
-    }
-  }
-  // Encoder.speed();
   if (millis() > lastMillis + delayTime) {
     lastMillis = millis();
   }
@@ -62,8 +70,7 @@ void printCenterTest(int targetVal) {
   u8g2.drawRFrame(2, 50, 124, 13, 6);
   if (targetVal == 0) {
     u8g2.drawRBox(4, 52, 0, 9, 0);
-  }
-  else {
+  } else {
     u8g2.drawRBox(4, 52, targetVal * 12, 9, 4);
   }
   u8g2.sendBuffer();
