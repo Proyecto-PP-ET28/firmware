@@ -1,77 +1,142 @@
-#include <Arduino.h>
-#include <HX711.h>        // Celda de carga
-#include <MD_REncoder.h>  // Encoder
-#include <U8g2lib.h>      // Display
-
 #include "declarations.h"
-#include "soc/rtc.h"
 
-U8G2_SH1106_128X64_NONAME_F_4W_SW_SPI u8g2(U8G2_R0, OLED_SCL, OLED_SDA, OLED_CS, OLED_DC, OLED_RES);
-MD_REncoder Encoder = MD_REncoder(EN_CLK, EN_DT);
-HX711 Load;
+bool debug = false;
 
-int testVal = 0;
-int delayTime = 100;
-unsigned long lastMillis = 0;
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
+JSONVar currentValues;
 
-void IRAM_ATTR Ext_INT1_ISR()
-{
-   uint8_t rotation = Encoder.read();
-  if (rotation) {
-    if (rotation == 16) {  // left
-      testVal--;
-      if (testVal < 0) testVal = 0;
-      printCenterTest(testVal);
-    } else if (rotation == 32) {  // right
-      testVal++;
-      if (testVal > 10) testVal = 10;
-      printCenterTest(testVal);
+//! -------------------------------------------------------------------------- !//
+//!                                    MAIN                                    !//
+//! -------------------------------------------------------------------------- !//
+
+void setup() {
+  if (debug) Serial.begin(115200);
+
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+  pinMode(WIFI_STATUS, OUTPUT);
+
+  ledcSetup(LED3_CH, PWM_FREQ, PWM_RES);
+  ledcSetup(LED4_CH, PWM_FREQ, PWM_RES);
+  ledcAttachPin(LED3_PIN, LED3_CH);
+  ledcAttachPin(LED4_PIN, LED4_CH);
+
+  initFS();
+  initWiFi();
+  initWebSocket();
+  initServer();
+}
+
+void loop() {
+  ws.cleanupClients();
+  if (millis() > lastMillis + delayTime) {
+    lastMillis = millis();
+    if (debug) Serial.println(getCurrentValues());
+  }
+}
+
+//! -------------------------------------------------------------------------- !//
+//!                                    INITS                                   !//
+//! -------------------------------------------------------------------------- !//
+
+void initFS() {
+  if (!SPIFFS.begin()) {
+    if (debug) Serial.println("An error has occurred while mounting SPIFFS");
+  } else {
+    if (debug) Serial.println("SPIFFS mounted successfully");
+  }
+}
+
+void initWiFi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(LOCAL_SSID, LOCAL_PASS);
+  if (debug) Serial.print("Connecting to WiFi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    if (debug) Serial.print('.');
+    delay(500);
+  }
+  digitalWrite(WIFI_STATUS, HIGH);
+  if (debug) Serial.println(WiFi.localIP());
+}
+
+void initWebSocket() {
+  ws.onEvent(onEvent);
+  server.addHandler(&ws);
+}
+
+void initServer() {
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) { //Envía el index.html cuando se hace el request
+    request->send(SPIFFS, "/index.html", "text/html");
+  });
+  server.on("/B2", HTTP_GET, [](AsyncWebServerRequest *request) { //Envía el estado del led 4 cuando se hace el request
+    request->send_P(200, "text/plain", String(ledState2).c_str());
+  });
+  server.on("/S2", HTTP_GET, [](AsyncWebServerRequest *request) { //Envía el valor de PWM del led 2 cuando se hace el request
+    request->send_P(200, "text/plain", String(ledValue4).c_str());
+  });
+  server.serveStatic("/", SPIFFS, "/");
+  server.begin();
+}
+
+//! -------------------------------------------------------------------------- !//
+//!                                  WEBSOCKET                                 !//
+//! -------------------------------------------------------------------------- !//
+
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  switch (type) {
+    case WS_EVT_CONNECT:
+      if (debug) Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+      break;
+    case WS_EVT_DISCONNECT:
+      if (debug) Serial.printf("WebSocket client #%u disconnected\n", client->id());
+      break;
+    case WS_EVT_DATA:
+      handleWebSocketMessage(arg, data, len);
+      break;
+    case WS_EVT_PONG:
+    case WS_EVT_ERROR:
+      break;
+  }
+}
+
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+  AwsFrameInfo *info = (AwsFrameInfo *)arg;
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+    data[len] = 0;
+    message = (char *)data;
+    if (message.indexOf("B1") >= 0) { // Se ejecuta cunando se presiona el botón 1
+      ledState1 = !ledState1;
+      digitalWrite(LED1_PIN, ledState1);
+    }
+    if (message.indexOf("B2") >= 0) { // Se ejecuta cunando se presiona el botón 2
+      ledState2 = !ledState2;
+      digitalWrite(LED2_PIN, ledState2);
+    }
+    if (message.indexOf("S1") >= 0) { // Se ejecuta cunando se actualiza el slider 1
+      ledValue3 = message.substring(2).toInt();
+      ledcWrite(LED3_CH, ledValue3);
+    }
+    if (message.indexOf("S2") >= 0) { // Se ejecuta cunando se actualiza el slider 2
+      ledValue4 = message.substring(2).toInt();
+      ledcWrite(LED4_CH, ledValue4);
+    }
+    if (strcmp((char *)data, "getValues") == 0) { //Devuelve los valores de las variables actuales cunado se hace el request
+      notifyClients(getCurrentValues());
     }
   }
 }
 
-void setup() {
-  //! Esto limita la frecuencia del CPU porque es demasiado rápido para medir los valores de la celda de carga
-  // TODO Hay que buscar otra librería u otra solución porque esto no es ideal
-  rtc_clk_cpu_freq_set(RTC_CPU_FREQ_80M);
-
-  Serial.begin(57600);
-
-  u8g2.begin();
-  Encoder.begin();
-  Load.begin(LOAD_SCK, LOAD_DT);
-
-  Load.set_scale(CAL_VALUE);  // Asigna el valor de calibración
-  Load.tare();                // Asigna el valor del tare
-  // Load.get_units(N_READINGS);  // Devuelve el valor del ADC convertido a gramos menos el valor del tare
-  printCenterTest(testVal);
-
-  pinMode(EN_CLK, INPUT);
-  pinMode(EN_DT, INPUT);
-  attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
-  attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
+void notifyClients(String currentValues) {
+  ws.textAll(currentValues);
 }
 
-void loop() {
-  if (millis() > lastMillis + delayTime) {
-    lastMillis = millis();
-  }
-}
-
-void printCenterTest(int targetVal) {
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_helvB14_tf);
-  String tempString = String(targetVal) + "%";
-  int textWidth = u8g2.getStrWidth(tempString.c_str());
-  int textOffset = (128 - textWidth) / 2;
-  u8g2.setCursor(textOffset, 24);
-  u8g2.print(targetVal * 10);
-  u8g2.print("%");
-  u8g2.drawRFrame(2, 50, 124, 13, 6);
-  if (targetVal == 0) {
-    u8g2.drawRBox(4, 52, 0, 9, 0);
-  } else {
-    u8g2.drawRBox(4, 52, targetVal * 12, 9, 4);
-  }
-  u8g2.sendBuffer();
+String getCurrentValues() {
+  currentValues["ledState1"] = String(ledState1);
+  currentValues["ledState2"] = String(ledState2);
+  currentValues["ledValue3"] = String(ledValue3);
+  currentValues["ledValue4"] = String(ledValue4);
+  
+  String jsonString = JSON.stringify(currentValues);
+  return jsonString;
 }
