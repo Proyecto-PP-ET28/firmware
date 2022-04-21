@@ -1,6 +1,6 @@
 #include "declarations.h"
 
-bool debug = false;
+bool debug = false; // Habilita debugging por monitor serie
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
