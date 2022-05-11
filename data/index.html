@@ -9,25 +9,15 @@
 </head>
 <body>
   <div class="card">
-    <div class="title">LED 1</div>
-    <div>Botón (sin feedback)</div>
-    <button type="button" id="button1" onclick="sendButton1()">ON / OFF</button>
-  </div>
-  <div class="card">
-    <div class="title">LED 2</div>
-    <div>Botón (con feedback)</div>
-    <button type="button" id="button2" onclick="sendButton2()">ON / OFF</button>
-    <div id="button2-value" class="value">0</div>
-  </div>
-  <div class="card">
-    <div class="title">LED 3</div>
-    <div>Slider (sin feedback)</div>
+    <div class="title">PWM</div>
+    <div>Slider</div>
     <input type="range" id="slider1" min="0" max="255" step="1" value="0" oninput="sendSlider1()" onchange="getValues()"></input>
+    <div id="slider1-value" class="value">0</div>
   </div>
   <div class="card">
-    <div class="title">LED 4</div>
-    <div>Slider (con feedback)</div>
-    <input type="range" id="slider2" min="0" max="255" step="1" value="0" oninput="sendSlider2()" onchange="getValues()"></input>
+    <div class="title">Batería</div>
+    <div>Slider</div>
+    <input type="range" id="slider2" min="0" max="100" step="1" value="0" oninput="sendSlider2()" onchange="getValues()"></input>
     <div id="slider2-value" class="value">0</div>
   </div>
 <script src="script.js"></script>

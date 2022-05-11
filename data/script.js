@@ -32,26 +32,16 @@ function onClose(event) {
 
 function onMessage(event) {
   const currentValues = JSON.parse(event.data);
-  document.getElementById("slider1").value = currentValues.ledValue3;
-  document.getElementById("slider2").value = currentValues.ledValue4;
-  document.getElementById("button2-value").innerHTML = currentValues.ledState2;
-  document.getElementById("slider2-value").innerHTML = currentValues.ledValue4;
-}
-
-function sendButton1() {
-  websocket.send('B1'.toString());
-  getValues();
-}
-
-function sendButton2() {
-  websocket.send('B2'.toString());
-  getButton2Value();
-  getValues();
+  document.getElementById("slider1").value = currentValues.motorPWM;
+  document.getElementById("slider2").value = currentValues.batteryLevel;
+  document.getElementById("slider1-value").innerHTML = currentValues.motorPWM;
+  document.getElementById("slider2-value").innerHTML = currentValues.batteryLevel;
 }
 
 function sendSlider1() {
   const sliderValue = document.getElementById("slider1").value;
   websocket.send('S1' + sliderValue.toString());
+  getSlider1Value();
 }
 
 function sendSlider2() {
@@ -60,14 +50,14 @@ function sendSlider2() {
   getSlider2Value();
 }
 
-function getButton2Value() {
+function getSlider1Value() {
   const xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function () {
     if (this.readyState == 4 && this.status == 200) {
-      document.getElementById("button2-value").innerHTML = this.responseText;
+      document.getElementById("slider1-value").innerHTML = this.responseText;
     }
   };
-  xhttp.open('GET', '/B2', true);
+  xhttp.open('GET', '/S1', true);
   xhttp.send();
 }
 
@@ -81,8 +71,3 @@ function getSlider2Value() {
   xhttp.open('GET', '/S2', true);
   xhttp.send();
 }
-
-//! Poner las funciones inline en el html o hacer una función para cada input no es lo mejor
-
-// setInterval(function ( ) {
-// }, 300 ) ;
