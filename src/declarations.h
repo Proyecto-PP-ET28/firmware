@@ -1,6 +1,7 @@
 #include <ArduinoOTA.h>
 #include <Arduino_JSON.h>
 #include <AsyncTCP.h>
+#include "WebServer.h"
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <HX711.h>
@@ -10,10 +11,8 @@
 #include <WiFiManager.h>
 #include <WiFiUdp.h>
 #include <qrcode.h>
-
 #include "Arduino.h"
 #include "SPIFFS.h"
-#include "WebServer.h"
 
 //* Credenciales WiFi
 const char *LOCAL_SSID = "";
@@ -50,12 +49,17 @@ const char *LOCAL_PASS = "";
 unsigned long debounceMillis = 0;
 bool btnState = true;
 
+
+//* Sensor IR
+#define IR_SENSOR 16
+
 //* Variables globales
 String message = "";
 bool clientIsConnected = 0;
 int motorPWM = 0;
 int batteryLevel = 0;
 int thrust;
+int RPM;
 
 int delayTime = 200;
 unsigned long lastMillis = 0;

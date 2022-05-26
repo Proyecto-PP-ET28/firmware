@@ -15,7 +15,7 @@ HX711 Load;
 //!                                 INTERRUPTS                                 !//
 //! -------------------------------------------------------------------------- !//
 
-void IRAM_ATTR Ext_INT1_ISR() {
+void IRAM_ATTR Ext_INT1_ISR() {  // PWM utilizando Encoder por interrupción
   uint8_t rotation = Encoder.read();
   if (rotation) {
     if (rotation == 16) {  // izquierda
@@ -36,7 +36,7 @@ void IRAM_ATTR Ext_INT1_ISR() {
   }
 }
 
-void IRAM_ATTR Ext_INT2_ISR() {
+void IRAM_ATTR Ext_INT2_ISR() { //Switch del Encoder
   if (!digitalRead(EN_SW) && btnState && millis() > debounceMillis + DEBOUNCE_TIME) {
     debounceMillis = millis();
     btnState = false;
@@ -46,6 +46,10 @@ void IRAM_ATTR Ext_INT2_ISR() {
     debounceMillis = millis();
     btnState = true;
   }
+}
+
+void ICACHE_RAM_ATTR Ext_INT3_ISR() { // Contador de RPMs
+  RPM++;
 }
 
 //! -------------------------------------------------------------------------- !//
@@ -72,9 +76,12 @@ void setup() {
   pinMode(EN_CLK, INPUT);
   pinMode(EN_DT, INPUT);
   pinMode(EN_SW, INPUT);
+  pinMode(IR_SENSOR, INPUT_PULLUP); 
+ 
   attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
+  attachInterrupt(IR_SENSOR, Ext_INT3_ISR, RISING);
 }
 
 void loop() {
@@ -93,13 +100,17 @@ void loop() {
     lastMillis = millis();
     getThrust();
   }
+  int wings = 2;
+  unsigned int RPMnew = (RPM / wings) * 60; // Pulsos del sensor / palas de la hélice = Rev. p/seg. --> * 60 = RPM
+  if(debug) Serial.printf("RPM: %u ", RPMnew);
+  RPM = 0;
 }
 
 //! -------------------------------------------------------------------------- !//
 //!                                    INITS                                   !//
 //! -------------------------------------------------------------------------- !//
 
-void initLoadCell() {
+void initLoadCell() {  // Célula de carga
   Load.begin(LOAD_DT, LOAD_SCK);
   Load.set_scale(CAL_VALUE);
   Load.tare();
@@ -113,7 +124,7 @@ void initFS() {
   }
 }
 
-void initWiFi() {
+void initWiFi() { // Conexión WiFi
   WiFi.mode(WIFI_STA);
   // WiFi.begin(LOCAL_SSID, LOCAL_PASS);
   // wifiManager.resetSettings();
@@ -144,7 +155,7 @@ void initWebSocket() {
   server.addHandler(&ws);
 }
 
-void initServer() {
+void initServer() {   // Server: Requests al Server
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {  // Envía el index.html cuando se hace el request
     request->send(SPIFFS, "/index.html", "text/html");
   });
@@ -158,7 +169,7 @@ void initServer() {
   server.begin();
 }
 
-void initOTA() {
+void initOTA() {  //Actualizaciones OTA
   ArduinoOTA
       .onStart([]() {
         String type;
@@ -220,10 +231,10 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     data[len] = 0;
     message = (char *)data;
-    if (message.indexOf("S1") >= 0) {  // Se ejecuta cunando se actualiza el slider 1
+    if (message.indexOf("S1") >= 0) {  // Se ejecuta cuando se actualiza el slider 1
       motorPWM = message.substring(2).toInt();
     }
-    if (message.indexOf("S2") >= 0) {  // Se ejecuta cunando se actualiza el slider 2
+    if (message.indexOf("S2") >= 0) {  // Se ejecuta cuando se actualiza el slider 2
       batteryLevel = message.substring(2).toInt();
     }
     if (strcmp((char *)data, "getValues") == 0) {  // Devuelve los valores de las variables actuales cunado se hace el request
