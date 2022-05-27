@@ -1,7 +1,8 @@
 #include <ArduinoOTA.h>
 #include <Arduino_JSON.h>
 #include <AsyncTCP.h>
-#include "WebServer.h"
+#include <ESP32Servo.h>
+#include <WebServer.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <HX711.h>
@@ -11,58 +12,94 @@
 #include <WiFiManager.h>
 #include <WiFiUdp.h>
 #include <qrcode.h>
+
 #include "Arduino.h"
 #include "SPIFFS.h"
+#include "esp_adc_cal.h"
 
 //* Credenciales WiFi
 const char *LOCAL_SSID = "";
 const char *LOCAL_PASS = "";
 
 //* Display (OLED)
-#define OLED_SCL 18
-#define OLED_SDA 23
-#define OLED_RES 17
-#define OLED_DC 27
+#define OLED_SCL 26
+#define OLED_SDA 25
+#define OLED_RES 33
+#define OLED_DC 32
 #define OLED_CS 80  // N/C
 
 //* Encoder (EN)
-#define EN_CLK 36
-#define EN_DT 39
-#define EN_SW 34
+#define EN_CLK 27
+#define EN_DT 14
+#define EN_SW 13
 
 //* Celda de carga (LOAD)
-#define LOAD_SCK 15
+#define LOAD_SCK 0
 #define LOAD_DT 4
-#define CAL_VALUE -435
+#define LOAD_CAL_VALUE -435
+#define THRUST_READING_DELAY 200
+unsigned long trustLastMillis = 0;
+int thrust;
 
-//* LEDs
+//* Sensor IR
+#define IR_SENSOR 16
+int RPM;
+
+//* LED
 #define WIFI_STATUS 2
 
-//* PWM
-#define PWM_FREQ 5000
-#define PWM_RES 8
-#define MOTOR_PWM_PIN 22
-#define MOTOR_CH 0
+//* ESC
+#define ESC_PWM 22
+#define ESC_INIT_TIME 1500
+#define MIN_PWM_VAL 0
+#define MAX_PWM_VAL 180
+int motorPWM = 0;
+
+//* ADCs
+#define INT_BAT 36
+#define EXT_BAT 39
+#define CURRENT_SENSOR 34
+#define EXT_BAT_VOLT_DIV_FACTOR 11
+#define INT_BAT_VOLT_DIV_FACTOR 11
+#define ADC_N_READINGS 20
+#define ADC_READING_DELAY 2
+#define ADC_MAP_IN_MIN 0.02
+#define ADC_MAP_IN_MAX 2.60
+#define ADC_MAP_OUT_MIN 0.12
+#define ADC_MAP_OUT_MAX 2.75
+#define CURRENT_SENS 25
+#define CURRENT_OFFSET 0.095
+#define CURRENT_QOV 2.5
+unsigned long ADCLastMillis = 0;
+int ADCReadingCount = 0;
+float ADCVoltFactor = 0;
+float rawIntBatVolt = 0;
+float rawExtBatVolt = 0;
+float rawExtBatAmp = 0;
+float intBatVolt = 0;
+float extBatVolt = 0;
+float extBatAmp = 0;
 
 //* Botón
 #define DEBOUNCE_TIME 30
 unsigned long debounceMillis = 0;
 bool btnState = true;
 
-
-//* Sensor IR
-#define IR_SENSOR 16
+//* Menú
+#define MENU_SIZE 3
+String menuItem[MENU_SIZE] = {"Volver", "Grabar", "Config."};
+int currentMenuIndex = 0;
+bool isMenuOpen = false;
 
 //* Variables globales
-String message = "";
-bool clientIsConnected = 0;
-int motorPWM = 0;
+bool clientIsConnected = 1;
 int batteryLevel = 0;
-int thrust;
-int RPM;
 
-int delayTime = 200;
-unsigned long lastMillis = 0;
+//* Debug
+unsigned long millis_time;
+unsigned long millis_time_last;
+float fps;
+int ms;
 
 //! -------------------------------------------------------------------------- !//
 //!                                  FUNCIONES                                 !//
@@ -85,13 +122,11 @@ void oledPrintInitScreen();
 void initOTA();
 void initLoadCell();
 void oledPrintMainScreen();
-void getThrust();
-
-//* Debug
-unsigned long millis_time;
-unsigned long millis_time_last;
-float fps;
-int ms;
+void readThrust();
+void oledPrintMenu();
+void initADC();
+void readADCs();
+float mapFloat(float x, float inMin, float inMax, float outMin, float outMax);
 
 //! -------------------------------------------------------------------------- !//
 //!                                   BITMAPS                                  !//
@@ -119,3 +154,45 @@ static const unsigned char bottom_bar_bits[] U8X8_PROGMEM = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff};
+
+#define down_arrow_width 12
+#define down_arrow_height 7
+static const unsigned char down_arrow_bits[] U8X8_PROGMEM = {
+    0x03, 0x0c, 0x07, 0x0e, 0x0e, 0x07, 0x9c, 0x03, 0xf8, 0x01, 0xf0, 0x00,
+    0x60, 0x00};
+
+#define up_arrow_width 12
+#define up_arrow_height 7
+static const unsigned char up_arrow_bits[] U8X8_PROGMEM = {
+    0x60, 0x00, 0xf0, 0x00, 0xf8, 0x01, 0x9c, 0x03, 0x0e, 0x07, 0x07, 0x0e,
+    0x03, 0x0c};
+
+#define cog_width 22
+#define cog_height 22
+static const unsigned char cog_bits[] U8X8_PROGMEM = {
+    0x00, 0x1e, 0x00, 0x00, 0x3f, 0x00, 0x70, 0xb3, 0x03, 0xf8, 0xf3, 0x07,
+    0xdc, 0xc0, 0x0e, 0x0c, 0x00, 0x0c, 0x1c, 0x00, 0x0e, 0x18, 0x1e, 0x06,
+    0x0e, 0x3f, 0x1c, 0x8f, 0x73, 0x3c, 0x83, 0x61, 0x30, 0x83, 0x61, 0x30,
+    0x8f, 0x73, 0x3c, 0x0e, 0x3f, 0x1c, 0x18, 0x1e, 0x06, 0x1c, 0x00, 0x0e,
+    0x0c, 0x00, 0x0c, 0xdc, 0xc0, 0x0e, 0xf8, 0xf3, 0x07, 0x70, 0xb3, 0x03,
+    0x00, 0x3f, 0x00, 0x00, 0x1e, 0x00};
+
+#define return_width 22
+#define return_height 22
+static const unsigned char return_bits[] U8X8_PROGMEM = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x00, 0xe0, 0x00, 0x00,
+    0x70, 0x00, 0x00, 0x38, 0x00, 0x00, 0x1c, 0x00, 0x00, 0xfe, 0xff, 0x01,
+    0xfe, 0xff, 0x07, 0x1c, 0x00, 0x0f, 0x38, 0x00, 0x0c, 0x70, 0x00, 0x1c,
+    0xe0, 0x00, 0x18, 0xc0, 0x00, 0x18, 0x00, 0x00, 0x18, 0x00, 0x00, 0x1c,
+    0x00, 0x00, 0x0c, 0x00, 0x00, 0x0e, 0x00, 0xfc, 0x07, 0x00, 0xfc, 0x01,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+#define start_width 22
+#define start_height 22
+static const unsigned char start_bits[] U8X8_PROGMEM = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x01, 0x00, 0xf0, 0x03, 0x00,
+    0x30, 0x0f, 0x00, 0x30, 0x1c, 0x00, 0x30, 0x78, 0x00, 0x30, 0xe0, 0x00,
+    0x30, 0xc0, 0x03, 0x30, 0x00, 0x07, 0x30, 0x00, 0x06, 0x30, 0x00, 0x06,
+    0x30, 0x00, 0x07, 0x30, 0xc0, 0x03, 0x30, 0xe0, 0x01, 0x30, 0x78, 0x00,
+    0x30, 0x3c, 0x00, 0x30, 0x0f, 0x00, 0xf0, 0x07, 0x00, 0xe0, 0x01, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00};

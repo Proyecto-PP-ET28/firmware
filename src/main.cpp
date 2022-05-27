@@ -1,46 +1,50 @@
 #include "declarations.h"
 
-bool debug = true;  // Habilita debugging
+bool debug = false;  // Habilita debugging
 
 U8G2_SH1106_128X64_NONAME_F_4W_SW_SPI u8g2(U8G2_R0, OLED_SCL, OLED_SDA, OLED_CS, OLED_DC, OLED_RES);
 MD_REncoder Encoder = MD_REncoder(EN_CLK, EN_DT);
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
-WiFiManager wifiManager;
 JSONVar currentValues;
+WiFiManager wifiManager;
 QRCode qrcode;
 HX711 Load;
+Servo ESC;
 
 //! -------------------------------------------------------------------------- !//
-//!                                 INTERRUPTS                                 !//
+//!                               INTERRUPCIONES                               !//
 //! -------------------------------------------------------------------------- !//
 
 void IRAM_ATTR Ext_INT1_ISR() {  // PWM utilizando Encoder por interrupción
   uint8_t rotation = Encoder.read();
   if (rotation) {
     if (rotation == 16) {  // izquierda
-      if (Encoder.speed() > 7) motorPWM -= 3;
-      if (Encoder.speed() > 15)
+      if (!isMenuOpen) {
         motorPWM -= 5;
-      else
-        motorPWM--;
-      if (motorPWM < 0) motorPWM = 0;
+        if (motorPWM < MIN_PWM_VAL) motorPWM = MIN_PWM_VAL;
+      } else {
+        currentMenuIndex--;
+        if (currentMenuIndex < 0) currentMenuIndex = 0;
+      }
+
     } else if (rotation == 32) {  // derecha
-      if (Encoder.speed() > 7) motorPWM += 3;
-      if (Encoder.speed() > 15)
+      if (!isMenuOpen) {
         motorPWM += 5;
-      else
-        motorPWM++;
-      if (motorPWM > 255) motorPWM = 255;
+        if (motorPWM > MAX_PWM_VAL) motorPWM = MAX_PWM_VAL;
+      } else {
+        currentMenuIndex++;
+        if (currentMenuIndex > MENU_SIZE - 1) currentMenuIndex = MENU_SIZE - 1;
+      }
     }
   }
 }
 
-void IRAM_ATTR Ext_INT2_ISR() { //Switch del Encoder
+void IRAM_ATTR Ext_INT2_ISR() {  // Switch del Encoder
   if (!digitalRead(EN_SW) && btnState && millis() > debounceMillis + DEBOUNCE_TIME) {
     debounceMillis = millis();
     btnState = false;
-    clientIsConnected = !clientIsConnected;
+    isMenuOpen = !isMenuOpen;
   }
   if (digitalRead(EN_SW) && millis() > debounceMillis + DEBOUNCE_TIME) {
     debounceMillis = millis();
@@ -48,7 +52,7 @@ void IRAM_ATTR Ext_INT2_ISR() { //Switch del Encoder
   }
 }
 
-void ICACHE_RAM_ATTR Ext_INT3_ISR() { // Contador de RPMs
+void ICACHE_RAM_ATTR Ext_INT3_ISR() {  // Contador de RPMs
   RPM++;
 }
 
@@ -57,27 +61,29 @@ void ICACHE_RAM_ATTR Ext_INT3_ISR() { // Contador de RPMs
 //! -------------------------------------------------------------------------- !//
 
 void setup() {
-  if (debug) Serial.begin(115200);
+  Serial.begin(115200);
   u8g2.begin();
   oledPrintInitScreen();
 
+  ESC.attach(ESC_PWM);
+  ESC.writeMicroseconds(ESC_INIT_TIME);
+
   Encoder.begin();
+  initADC();
   initFS();
-  initWiFi();
+  initWiFi(); // Conexión WiFi
   initWebSocket();
-  initServer();
-  initOTA();
-  initLoadCell();
+  initServer();   // Server: Requests al Server
+  initOTA();  //Actualizaciones OTA
+  initLoadCell();  // Celda de carga
 
   pinMode(WIFI_STATUS, OUTPUT);
-  ledcSetup(MOTOR_CH, PWM_FREQ, PWM_RES);
-  ledcAttachPin(MOTOR_PWM_PIN, MOTOR_CH);
 
   pinMode(EN_CLK, INPUT);
   pinMode(EN_DT, INPUT);
   pinMode(EN_SW, INPUT);
-  pinMode(IR_SENSOR, INPUT_PULLUP); 
- 
+  pinMode(IR_SENSOR, INPUT_PULLUP);
+
   attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
@@ -87,32 +93,39 @@ void setup() {
 void loop() {
   ArduinoOTA.handle();
   ws.cleanupClients();
+  ESC.write(motorPWM);
+  readADCs();
+  readThrust();
+
+  int wings = 2;
+  unsigned int RPMnew = (RPM / wings) * 60;  // Pulsos del sensor / palas de la hélice = Rev. p/seg. --> * 60 = RPM
+  if (debug) Serial.printf("RPM: %u ", RPMnew);
+  RPM = 0;
 
   if (clientIsConnected) {
-    oledPrintMainScreen();
+    if (isMenuOpen) {
+      oledPrintMenu();
+    } else {
+      oledPrintMainScreen();
+    }
   } else {
     oledPrintIP();
   }
-
-  ledcWrite(MOTOR_CH, motorPWM);
-
-  if (millis() > lastMillis + delayTime) {
-    lastMillis = millis();
-    getThrust();
-  }
-  int wings = 2;
-  unsigned int RPMnew = (RPM / wings) * 60; // Pulsos del sensor / palas de la hélice = Rev. p/seg. --> * 60 = RPM
-  if(debug) Serial.printf("RPM: %u ", RPMnew);
-  RPM = 0;
 }
 
 //! -------------------------------------------------------------------------- !//
 //!                                    INITS                                   !//
 //! -------------------------------------------------------------------------- !//
 
-void initLoadCell() {  // Célula de carga
+void initADC() {
+  esp_adc_cal_characteristics_t adc_chars;
+  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
+  ADCVoltFactor = (1 / 4095.0) * 3.3 * (1100 / adc_chars.vref);
+}
+
+void initLoadCell() {
   Load.begin(LOAD_DT, LOAD_SCK);
-  Load.set_scale(CAL_VALUE);
+  Load.set_scale(LOAD_CAL_VALUE);
   Load.tare();
 }
 
@@ -124,7 +137,7 @@ void initFS() {
   }
 }
 
-void initWiFi() { // Conexión WiFi
+void initWiFi() {
   WiFi.mode(WIFI_STA);
   // WiFi.begin(LOCAL_SSID, LOCAL_PASS);
   // wifiManager.resetSettings();
@@ -155,7 +168,7 @@ void initWebSocket() {
   server.addHandler(&ws);
 }
 
-void initServer() {   // Server: Requests al Server
+void initServer() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {  // Envía el index.html cuando se hace el request
     request->send(SPIFFS, "/index.html", "text/html");
   });
@@ -169,7 +182,7 @@ void initServer() {   // Server: Requests al Server
   server.begin();
 }
 
-void initOTA() {  //Actualizaciones OTA
+void initOTA() {
   ArduinoOTA
       .onStart([]() {
         String type;
@@ -230,7 +243,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   AwsFrameInfo *info = (AwsFrameInfo *)arg;
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     data[len] = 0;
-    message = (char *)data;
+    String message = (char *)data;
     if (message.indexOf("S1") >= 0) {  // Se ejecuta cuando se actualiza el slider 1
       motorPWM = message.substring(2).toInt();
     }
@@ -347,7 +360,7 @@ void oledPrintBattery(int level, bool showPercentage) {
 
 void oledPrintBar(bool showNumber, bool convertToPercentage) {
   u8g2.drawXBMP(0, 54, bottom_bar_width, bottom_bar_height, bottom_bar_bits);
-  int barWidth = map(motorPWM, 0, 255, 0, 122);
+  int barWidth = map(motorPWM, MIN_PWM_VAL, MAX_PWM_VAL, 0, 122);
   if (barWidth < 3) barWidth = 3;
   if (motorPWM != 0) u8g2.drawRBox(3, 57, barWidth, 4, 1);
 
@@ -360,7 +373,7 @@ void oledPrintBar(bool showNumber, bool convertToPercentage) {
     if (!convertToPercentage) {
       u8g2.print(motorPWM);
     } else {
-      int percentage = map(motorPWM, 0, 255, 0, 100);
+      int percentage = map(motorPWM, MIN_PWM_VAL, MAX_PWM_VAL, 0, 100);
       u8g2.print(percentage);
       u8g2.setFont(u8g2_font_p01type_tr);
       u8g2.print("%");
@@ -368,17 +381,78 @@ void oledPrintBar(bool showNumber, bool convertToPercentage) {
   }
 }
 
+void oledPrintMenu() {
+  u8g2.clearBuffer();
+  u8g2.setDrawColor(1);
+  u8g2.setFont(u8g2_font_simple1_tf);
+  u8g2.drawBox(0, 18, 128, 30);
+
+  if (currentMenuIndex != 0) {
+    u8g2.drawXBMP(10, 4, up_arrow_width, up_arrow_height, up_arrow_bits);
+    u8g2.setCursor(27, 11);
+    u8g2.print(menuItem[currentMenuIndex - 1]);
+  }
+  if (currentMenuIndex != MENU_SIZE - 1) {
+    u8g2.drawXBMP(10, 54, down_arrow_width, down_arrow_height, down_arrow_bits);
+    u8g2.setCursor(27, 61);
+    u8g2.print(menuItem[currentMenuIndex + 1]);
+  }
+  u8g2.setDrawColor(0);
+  switch (currentMenuIndex) {
+    case 0:
+      u8g2.drawXBMP(5, 22, return_width, return_height, return_bits);
+      break;
+    case 1:
+      u8g2.drawXBMP(5, 22, start_width, start_height, start_bits);
+      break;
+    case 2:
+      u8g2.drawXBMP(5, 22, cog_width, cog_height, cog_bits);
+      break;
+  }
+  u8g2.setFont(u8g2_font_pixzillav1_te);
+  u8g2.setCursor(32, 38);
+  u8g2.print(menuItem[currentMenuIndex]);
+  u8g2.setDrawColor(1);
+  u8g2.sendBuffer();
+}
+
 //! -------------------------------------------------------------------------- !//
 //!                                  SENSORES                                  !//
 //! -------------------------------------------------------------------------- !//
 
-void getThrust() {
-  if (Load.wait_ready_timeout(1000)) {
-    thrust = Load.get_units(1);
-    if (debug) Serial.print("Weight: ");
-    if (debug) Serial.print(thrust, 10);
-    if (debug) Serial.println("g");
-  } else {
-    if (debug) Serial.println("HX711 not found");
+void readThrust() {
+  if (millis() > trustLastMillis + THRUST_READING_DELAY) {
+    trustLastMillis = millis();
+    if (Load.wait_ready_timeout(1000)) {
+      thrust = Load.get_units(1);
+      if (debug) Serial.print("Weight: ");
+      if (debug) Serial.print(thrust, 10);
+      if (debug) Serial.println("g");
+    } else {
+      if (debug) Serial.println("HX711 not found");
+    }
+  }
+}
+
+float mapFloat(float x, float inMin, float inMax, float outMin, float outMax) {
+  return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
+
+void readADCs() {
+  if (millis() > ADCLastMillis + ADC_READING_DELAY) {
+    ADCLastMillis = millis();
+    ADCReadingCount++;
+    rawIntBatVolt += analogRead(INT_BAT);
+    rawExtBatVolt += analogRead(EXT_BAT);
+    rawExtBatAmp += analogRead(CURRENT_SENSOR);
+    if (ADCReadingCount == ADC_N_READINGS) {
+      ADCReadingCount = 0;
+      intBatVolt = mapFloat(rawIntBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * INT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
+      extBatVolt = mapFloat(rawExtBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * EXT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
+      extBatAmp = (mapFloat(rawExtBatAmp / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * ADCVoltFactor - CURRENT_QOV + CURRENT_OFFSET) * CURRENT_SENS;
+      rawIntBatVolt = 0;
+      rawExtBatVolt = 0;
+      rawExtBatAmp = 0;
+    }
   }
 }
