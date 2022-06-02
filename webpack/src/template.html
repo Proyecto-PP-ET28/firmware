@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESIMA</title>
+</head>
+<body>
+  <div class="sliders">
+    <div class="card">
+      <div class="title">PWM</div>
+      <div>Slider</div>
+      <input type="range" id="slider1" min="0" max="180" step="1" value="0" oninput="sendSlider1()" onchange="getValues()"></input>
+      <div id="slider1-value" class="value">0</div>
+    </div>
+    <div class="card">
+      <div class="title">Batería</div>
+      <div>Slider</div>
+      <input type="range" id="slider2" min="0" max="100" step="1" value="0" oninput="sendSlider2()" onchange="getValues()"></input>
+      <div id="slider2-value" class="value">0</div>
+    </div>
+  </div>
+  <div class="charts">
+    <div class="chart">
+      <canvas id="thrust" width="200" height="140"></canvas>
+    </div>
+    <div class="chart">
+      <canvas id="rpm" width="200" height="140"></canvas>
+    </div>
+    <div class="chart">
+      <canvas id="amp" width="200" height="140"></canvas>
+    </div>
+    <div class="chart">
+      <canvas id="volt" width="200" height="140"></canvas>
+    </div>
+  </div>
+</body>
+</html>

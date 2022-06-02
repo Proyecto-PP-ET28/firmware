@@ -1,0 +1,83 @@
+@import '~normalize.css/normalize';
+@import ' ~rfs/scss';
+@import './constants';
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body,
+html {
+  font-family: Verdana, sans-serif;
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  gap: 6rem;
+  background: #121212;
+}
+
+.sliders {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+}
+
+.card,
+.title,
+.value {
+  position: relative;
+  background: #444;
+  display: flex;
+  font-size: 1rem;
+  color: #fff;
+  font-weight: 600;
+  padding: 1rem;
+  height: 120px;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.7rem;
+  flex-direction: column;
+  gap: 10px;
+}
+
+button {
+  font: 1rem;
+  padding: 0 0.7rem;
+  height: 2.2rem;
+}
+
+input[type='range'] {
+  height: 2.2rem;
+}
+
+.title,
+.value {
+  position: absolute;
+  bottom: calc(100% + 1rem);
+  height: auto;
+  width: auto;
+}
+
+.value {
+  top: calc(100% + 1rem);
+}
+
+.charts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+}
+.chart {
+  height: 150px;
+  width: 300px;
+}

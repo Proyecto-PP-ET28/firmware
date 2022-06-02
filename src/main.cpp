@@ -1,6 +1,6 @@
 #include "declarations.h"
 
-bool debug = false;  // Habilita debugging
+bool debug = true;  // Habilita debugging
 
 U8G2_SH1106_128X64_NONAME_F_4W_SW_SPI u8g2(U8G2_R0, OLED_SCL, OLED_SDA, OLED_CS, OLED_DC, OLED_RES);
 MD_REncoder Encoder = MD_REncoder(EN_CLK, EN_DT);
@@ -52,10 +52,6 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Switch del Encoder
   }
 }
 
-void ICACHE_RAM_ATTR Ext_INT3_ISR() {  // Contador de RPMs
-  RPM++;
-}
-
 //! -------------------------------------------------------------------------- !//
 //!                                    MAIN                                    !//
 //! -------------------------------------------------------------------------- !//
@@ -63,12 +59,9 @@ void ICACHE_RAM_ATTR Ext_INT3_ISR() {  // Contador de RPMs
 void setup() {
   Serial.begin(115200);
   u8g2.begin();
-  oledPrintInitScreen();
-
-  ESC.attach(ESC_PWM);
-  ESC.writeMicroseconds(ESC_INIT_TIME);
-
+  ESC.attach(ESC_PWM); 
   Encoder.begin();
+  oledPrintInitScreen();
   initADC();
   initFS();
   initWiFi(); // Conexión WiFi
@@ -87,7 +80,6 @@ void setup() {
   attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
-  attachInterrupt(IR_SENSOR, Ext_INT3_ISR, RISING);
 }
 
 void loop() {
@@ -96,11 +88,6 @@ void loop() {
   ESC.write(motorPWM);
   readADCs();
   readThrust();
-
-  int wings = 2;
-  unsigned int RPMnew = (RPM / wings) * 60;  // Pulsos del sensor / palas de la hélice = Rev. p/seg. --> * 60 = RPM
-  if (debug) Serial.printf("RPM: %u ", RPMnew);
-  RPM = 0;
 
   if (clientIsConnected) {
     if (isMenuOpen) {
