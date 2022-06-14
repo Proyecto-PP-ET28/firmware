@@ -1,0 +1,123 @@
+@import './constants';
+
+input[type=range].slider {
+  height: $slider-height;
+  -webkit-appearance: none;
+}
+
+input[type=range].slider {
+  --range: calc(var(--max) - var(--min));
+  --ratio: calc((var(--value) - var(--min)) / var(--range));
+  --sx: calc(calc(0.5 * 0.5em) + calc(var(--ratio) * calc(100% - 0.5em)));
+}
+
+input[type=range].slider:focus {
+  outline: none;
+}
+
+input[type=range].slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: $slider-thumb-width;
+  height: $slider-thumb-height;
+  border-radius: $slider-thumb-border-radius;
+  background: $slider-thumb-color;
+  border: none;
+  box-shadow: none;
+  margin-top: calc($slider-height * 0.5 - $slider-thumb-height * 0.5);
+}
+
+input[type=range].slider::-webkit-slider-runnable-track {
+  height: $slider-height;
+  border: none;
+  border-radius: $slider-border-radius;
+  background: $slider-bg-color;
+  box-shadow: none;
+}
+
+input[type=range].slider::-webkit-slider-thumb:hover {
+  background: $slider-thumb-hover-color;
+}
+
+input[type=range].slider::-webkit-slider-thumb:active {
+  background: $slider-thumb-hover-color;
+}
+
+input[type=range].slider::-webkit-slider-runnable-track {
+  background: linear-gradient($slider-fill-color,$slider-fill-color) 0/var(--sx) 100% no-repeat, $slider-bg-color;
+}
+
+input[type=range].slider::-moz-range-thumb {
+  width: $slider-thumb-width;
+  height: $slider-thumb-height;
+  border-radius: $slider-thumb-border-radius;
+  background: $slider-thumb-color;
+  border: none;
+  box-shadow: none;
+}
+
+input[type=range].slider::-moz-range-track {
+  height: $slider-height;
+  border: none;
+  border-radius: $slider-border-radius;
+  background: $slider-bg-color;
+  box-shadow: none;
+}
+
+input[type=range].slider::-moz-range-thumb:hover {
+  background: $slider-thumb-hover-color;
+}
+
+input[type=range].slider::-moz-range-thumb:active {
+  background: $slider-thumb-hover-color;
+}
+
+input[type=range].slider::-moz-range-track {
+  background: linear-gradient($slider-fill-color,$slider-fill-color) 0/var(--sx) 100% no-repeat, $slider-bg-color;
+}
+
+input[type=range].slider::-ms-fill-upper {
+  background: transparent;
+  border-color: transparent;
+}
+
+input[type=range].slider::-ms-fill-lower {
+  background: transparent;
+  border-color: transparent;
+}
+
+input[type=range].slider::-ms-thumb {
+  width: $slider-thumb-width;
+  height: $slider-thumb-height;
+  border-radius: $slider-thumb-border-radius;
+  background: $slider-thumb-color;
+  border: none;
+  box-shadow: none;
+  margin-top: 0;
+  box-sizing: border-box;
+}
+
+input[type=range].slider::-ms-track {
+  height: $slider-height;
+  border-radius: $slider-border-radius;
+  background: $slider-bg-color;
+  border: none;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+input[type=range].slider::-ms-thumb:hover {
+  background: $slider-thumb-hover-color;
+}
+
+input[type=range].slider::-ms-thumb:active {
+  background: $slider-thumb-hover-color;
+}
+
+input[type=range].slider::-ms-fill-lower {
+  height: $slider-height;
+  border-radius: $slider-border-radius 0 0 $slider-border-radius;
+  margin: -undefined 0 -undefined -undefined;
+  background: $slider-fill-color;
+  border: none;
+  border-right-width: 0;
+}

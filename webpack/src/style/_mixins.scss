@@ -1,0 +1,13 @@
+@mixin svg-icon($path, $size, $color) {
+  height: $size;
+  width: $size;
+  background-color: $color;
+  mask-image: url($path);
+  background-size: cover;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}

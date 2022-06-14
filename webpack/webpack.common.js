@@ -6,6 +6,7 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: './src/template.html',
     }),
+
   ],
   module: {
     rules: [

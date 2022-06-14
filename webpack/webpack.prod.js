@@ -4,16 +4,28 @@ const { merge } = require('webpack-merge');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 const common = require('./webpack.common');
+const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = merge(common, {
   mode: 'production',
   output: {
     filename: 'bundle-[hash].js',
     path: path.resolve(__dirname, '../data'),
-    assetModuleFilename: 'images/[name]-[hash].[ext]',
+    assetModuleFilename: 'images/[name].[ext]',
   },
   optimization: {
-    minimizer: ['...', new CssMinimizerPlugin()],
+    minimizer: [
+      // '...',
+      // new CssMinimizerPlugin(),
+      new TerserPlugin({
+        extractComments: false,
+        terserOptions: {
+          format: {
+            comments: false,
+          },
+        },
+      }),
+    ],
   },
   plugins: [
     new MiniCssExtractPlugin({ filename: '[name]-[hash].css' }),

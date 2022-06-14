@@ -8,5 +8,8 @@
     "iram",
     "xbmp"
   ],
-  "cSpell.language": "en,es-ES"
+  "cSpell.language": "en,es-ES",
+  "files.associations": {
+    "string": "cpp"
+  }
 }

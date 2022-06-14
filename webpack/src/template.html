@@ -1,39 +1,122 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESIMA</title>
-</head>
-<body>
-  <div class="sliders">
-    <div class="card">
-      <div class="title">PWM</div>
-      <div>Slider</div>
-      <input type="range" id="slider1" min="0" max="180" step="1" value="0" oninput="sendSlider1()" onchange="getValues()"></input>
-      <div id="slider1-value" class="value">0</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESIMA</title>
+  </head>
+  <body>
+    <script>0</script>
+    <div class="overlay"></div>
+    <div id="sidebar">
+      <object
+        class="logo"
+        type="image/svg+xml"
+        data="./assets/images/logo.svg"
+      ></object>
+      <div class="menu">
+        <div id="home-menu" class="menu-item active">
+          <img src="./assets/icons/home-white.svg" class="home-icon white"></img>
+          <img src="./assets/icons/home-black.svg" class="home-icon black"></img>
+          <div>Tiempo real</div>
+        </div>
+        <div id="measurements-menu" class="menu-item">
+          <img src="./assets/icons/history-white.svg" class="history-icon white"></img>
+          <img src="./assets/icons/history-black.svg" class="history-icon black"></img>
+          <div>Mediciones</div>
+        </div>
+        <div id="settings-menu" class="menu-item">
+          <img src="./assets/icons/settings-white.svg" class="settings-icon white"></img>
+          <img src="./assets/icons/settings-black.svg" class="settings-icon black"></img>
+          <div>Configuración</div>
+        </div>
+      </div>
+      <div class="save">
+        <div class="title">GUARDAR</div>
+        <div>
+          <button id="snapshot">Captura</button>
+          <button id="recording">Grabación</button>
+        </div>
+        <button id="reset-max">Reiniciar máximos</button>
+      </div>
+      <div class="pwm">
+        <button id="stop">STOP</button>
+        <div class="value">
+          <button id="decrease-pwm">&#8722;</button>
+          <input
+            id="pwm-input"
+            type="number"
+            min="0"
+            max="100"
+            oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');"
+          />
+          <button id="increase-pwm">&#43;</button>
+        </div>
+        <input type="range" id="slider" class="slider" />
+      </div>
+      <div class="battery">
+        <div id="battery-level"></div>
+        <div id="battery-icon">
+          <img src="./assets/icons/battery/bat-0.svg" class="battery-icon-0"></img>
+          <img src="./assets/icons/battery/bat-33.svg" class="battery-icon-33"></img>
+          <img src="./assets/icons/battery/bat-66.svg" class="battery-icon-66"></img>
+          <img src="./assets/icons/battery/bat-100.svg" class="battery-icon-100"></img>
+          <img src="./assets/icons/battery/bat-charging.svg" class="battery-icon-charging"></img>
+        </div>
+      </div>
     </div>
-    <div class="card">
-      <div class="title">Batería</div>
-      <div>Slider</div>
-      <input type="range" id="slider2" min="0" max="100" step="1" value="0" oninput="sendSlider2()" onchange="getValues()"></input>
-      <div id="slider2-value" class="value">0</div>
+    <div class="main-container active" id="home">
+      <div class="card-container">
+        <div class="card">
+          <img src="./assets/icons/thrust.svg" class="thrust-icon"></img>
+          <div class="title" id="thrust-text">Empuje</div>
+          <div>
+            <div class="real-time" id="thrust-value"><div>0</div>&nbsp;g</div>
+            <div class="max" id="max-thrust"><div>0</div>&nbsp;g</div>
+          </div>
+        </div>
+        <div class="card">
+          <img src="./assets/icons/rpm.svg" class="rpm-icon"></img>
+          <div class="title" id="rpm-text">RPM</div>
+          <div>
+            <div class="real-time" id="rpm-value"><div>0</div></div>
+            <div class="max" id="max-rpm"><div>0</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <img src="./assets/icons/volt.svg" class="volt-icon"></img>
+          <div class="title" id="volt-text">Tensión</div>
+          <div>
+            <div class="real-time" id="volt-value"><div>0</div>&nbsp;V</div>
+            <div class="max" id="max-volt"><div>0</div>&nbsp;V</div>
+          </div>
+        </div>
+        <div class="card">
+          <img src="./assets/icons/amp.svg" class="amp-icon"></img>
+          <div class="title" id="amp-text">Corriente</div>
+          <div>
+            <div class="real-time" id="amp-value"><div>0</div>&nbsp;A</div>
+            <div class="max" id="max-amp"><div>0</div>&nbsp;A</div>
+          </div>
+        </div>
+      </div>
+      <div class="charts-container">
+        <div class="chart">
+          <canvas id="thrust-chart"></canvas>
+        </div>
+        <div class="chart">
+          <canvas id="rpm-chart"></canvas>
+        </div>
+        <div class="chart">
+          <canvas id="amp-chart"></canvas>
+        </div>
+        <div class="chart">
+          <canvas id="volt-chart"></canvas>
+        </div>
+      </div> 
     </div>
-  </div>
-  <div class="charts">
-    <div class="chart">
-      <canvas id="thrust" width="200" height="140"></canvas>
-    </div>
-    <div class="chart">
-      <canvas id="rpm" width="200" height="140"></canvas>
-    </div>
-    <div class="chart">
-      <canvas id="amp" width="200" height="140"></canvas>
-    </div>
-    <div class="chart">
-      <canvas id="volt" width="200" height="140"></canvas>
-    </div>
-  </div>
-</body>
+    <div class="main-container" id="measurements">Coming soon...<br>(~˘▾˘)~</div>
+    <div class="main-container" id="settings">Coming not that soon...<br>~(˘▾˘~)</div>
+  </body>
 </html>

@@ -27,14 +27,17 @@
     "sass": "^1.50.1",
     "sass-loader": "^12.6.0",
     "style-loader": "^3.3.1",
+    "terser-webpack-plugin": "^5.3.3",
     "webpack": "^5.72.0",
     "webpack-cli": "^4.9.2",
     "webpack-dev-server": "^4.8.1"
   },
   "dependencies": {
     "chart.js": "^3.8.0",
+    "chartjs-adapter-luxon": "^1.1.0",
     "chartjs-plugin-streaming": "^2.0.0",
     "clean-webpack-plugin": "^4.0.0",
+    "luxon": "^2.4.0",
     "webpack-merge": "^5.8.0"
   }
 }

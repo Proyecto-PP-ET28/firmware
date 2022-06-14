@@ -21,20 +21,32 @@ void IRAM_ATTR Ext_INT1_ISR() {  // PWM utilizando Encoder por interrupción
   if (rotation) {
     if (rotation == 16) {  // izquierda
       if (!isMenuOpen) {
-        motorPWM -= 5;
+        if (!isSliderDown) motorPWM -= 9;
         if (motorPWM < MIN_PWM_VAL) motorPWM = MIN_PWM_VAL;
       } else {
-        currentMenuIndex--;
-        if (currentMenuIndex < 0) currentMenuIndex = 0;
+        if (currentMenuIndex > 0) {
+          currentMenuIndex--;
+          if (currentMenuIndex < displayMenuIndex) {
+            displayMenuIndex--;
+          } else {
+            displayMenuSelected--;
+          }
+        }
       }
 
     } else if (rotation == 32) {  // derecha
       if (!isMenuOpen) {
-        motorPWM += 5;
+        if (!isSliderDown) motorPWM += 9;
         if (motorPWM > MAX_PWM_VAL) motorPWM = MAX_PWM_VAL;
       } else {
-        currentMenuIndex++;
-        if (currentMenuIndex > MENU_SIZE - 1) currentMenuIndex = MENU_SIZE - 1;
+        if (currentMenuIndex < MENU_SIZE - 1) {
+          currentMenuIndex++;
+          if (currentMenuIndex > displayMenuIndex + 3) {
+            displayMenuIndex++;
+          } else {
+            displayMenuSelected++;
+          }
+        }
       }
     }
   }
@@ -44,7 +56,33 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Switch del Encoder
   if (!digitalRead(EN_SW) && btnState && millis() > debounceMillis + DEBOUNCE_TIME) {
     debounceMillis = millis();
     btnState = false;
-    isMenuOpen = !isMenuOpen;
+
+    switch (currentMenuIndex) {
+      case 0:
+        isMenuOpen = !isMenuOpen;
+        break;
+      case 1:
+        if (menuItemValue[currentMenuIndex] == "ON") {
+          menuItemValue[currentMenuIndex] = "OFF";
+        } else {
+          menuItemValue[currentMenuIndex] = "ON";
+        }
+        break;
+      case 2:
+        if (menuItemValue[currentMenuIndex] == "ON") {
+          menuItemValue[currentMenuIndex] = "OFF";
+        } else {
+          menuItemValue[currentMenuIndex] = "ON";
+        }
+        break;
+      case 3:
+        if (menuItemValue[currentMenuIndex] == "ON") {
+          menuItemValue[currentMenuIndex] = "OFF";
+        } else {
+          menuItemValue[currentMenuIndex] = "ON";
+        }
+        break;
+    }
   }
   if (digitalRead(EN_SW) && millis() > debounceMillis + DEBOUNCE_TIME) {
     debounceMillis = millis();
@@ -59,17 +97,16 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Switch del Encoder
 void setup() {
   Serial.begin(115200);
   u8g2.begin();
-  ESC.attach(ESC_PWM); 
+  ESC.attach(ESC_PWM);
   Encoder.begin();
   oledPrintInitScreen();
   initADC();
   initFS();
-  initWiFi(); // Conexión WiFi
+  initWiFi();  // Conexión WiFi
   initWebSocket();
-  initServer();   // Server: Requests al Server
-  initOTA();  //Actualizaciones OTA
+  initServer();    // Server: Requests al Server
+  initOTA();       // Actualizaciones OTA
   initLoadCell();  // Celda de carga
-
   pinMode(WIFI_STATUS, OUTPUT);
 
   pinMode(EN_CLK, INPUT);
@@ -80,15 +117,33 @@ void setup() {
   attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
+
+  RPM = 9000;
 }
 
 void loop() {
   ArduinoOTA.handle();
   ws.cleanupClients();
   ESC.write(motorPWM);
-  readADCs();
   readThrust();
+  readADCs();
 
+  if (thrust > thrustMax) thrustMax = thrust;
+  if (RPM > RPMMax) RPMMax = RPM;
+  if (extBatVolt > extBatVoltMax) extBatVoltMax = extBatVolt;
+  if (extBatAmp > extBatAmpMax) extBatAmpMax = extBatAmp;
+
+  if (millis() > millisRandomRPM + 250) {
+    millisRandomRPM = millis();
+    int randomVar = random(300);
+    if (random(2) == 1) {
+      RPM += randomVar;
+    } else {
+      RPM -= randomVar;
+    }
+  }
+
+  batteryLevel = intBatVolt;
   if (clientIsConnected) {
     if (isMenuOpen) {
       oledPrintMenu();
@@ -126,17 +181,17 @@ void initFS() {
 
 void initWiFi() {
   WiFi.mode(WIFI_STA);
-  // WiFi.begin(LOCAL_SSID, LOCAL_PASS);
+  WiFi.begin(LOCAL_SSID, LOCAL_PASS);
   // wifiManager.resetSettings();
-  wifiManager.setClass("invert");
-  bool res = wifiManager.autoConnect("ESIMA AP");
-  if (debug) {
-    if (!res) {
-      Serial.println("Failed to connect");
-    } else {
-      Serial.println("Connection successful");
-    }
-  }
+  // wifiManager.setClass("invert");
+  // bool res = wifiManager.autoConnect("ESIMA AP");
+  // if (debug) {
+  //   if (!res) {
+  //     Serial.println("Failed to connect");
+  //   } else {
+  //     Serial.println("Connection successful");
+  //   }
+  // }
   if (debug) Serial.print("Connecting to WiFi...");
   while (WiFi.status() != WL_CONNECTED) {
     if (debug) Serial.print('.');
@@ -159,10 +214,22 @@ void initServer() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {  // Envía el index.html cuando se hace el request
     request->send(SPIFFS, "/index.html", "text/html");
   });
-  server.on("/S1", HTTP_GET, [](AsyncWebServerRequest *request) {  // Envía el estado del led 4 cuando se hace el request
-    request->send_P(200, "text/plain", String(motorPWM).c_str());
+  server.on("/thrust", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", String(thrust).c_str());
   });
-  server.on("/S2", HTTP_GET, [](AsyncWebServerRequest *request) {  // Envía el valor de PWM del led 2 cuando se hace el request
+  server.on("/rpm", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", String(RPM).c_str());
+  });
+  server.on("/volt", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", String(extBatVolt).c_str());
+  });
+  server.on("/amp", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", String(extBatAmp).c_str());
+  });
+  server.on("/pwm", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", String(map(motorPWM, MIN_PWM_VAL, MAX_PWM_VAL, 0, 100)).c_str());
+  });
+  server.on("/bat", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/plain", String(batteryLevel).c_str());
   });
   server.serveStatic("/", SPIFFS, "/");
@@ -231,13 +298,25 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     data[len] = 0;
     String message = (char *)data;
-    if (message.indexOf("S1") >= 0) {  // Se ejecuta cuando se actualiza el slider 1
-      motorPWM = message.substring(2).toInt();
+    if (message.indexOf("PWM") >= 0) {
+      motorPWM = map(message.substring(3).toInt(), 0, 100, MIN_PWM_VAL, MAX_PWM_VAL);
     }
-    if (message.indexOf("S2") >= 0) {  // Se ejecuta cuando se actualiza el slider 2
-      batteryLevel = message.substring(2).toInt();
+    if (message.indexOf("SNAP") >= 0) {
+      Serial.println("Captura");
     }
-    if (strcmp((char *)data, "getValues") == 0) {  // Devuelve los valores de las variables actuales cunado se hace el request
+    if (message.indexOf("REC") >= 0) {
+      Serial.println("Grabación");
+    }
+    if (message.indexOf("RST") >= 0) {
+      Serial.println("Reiniciar máximos");
+    }
+    if (message.indexOf("S_DOWN") >= 0) {
+      isSliderDown = true;
+    }
+    if (message.indexOf("S_UP") >= 0) {
+      isSliderDown = false;
+    }
+    if (strcmp((char *)data, "getValues") == 0) {
       notifyClients(getCurrentValues());
     }
   }
@@ -286,13 +365,58 @@ void oledPrintInitScreen() {
 
 void oledPrintMainScreen() {
   u8g2.clearBuffer();
-  if (debug) oledPrintFPS();
-  oledPrintBar(true, true);
-  oledPrintBattery(batteryLevel, true);
-  u8g2.setCursor(0, 12);
-  u8g2.setFont(u8g2_font_BBSesque_tr);
-  u8g2.print(thrust);
-  u8g2.print("g");
+  oledPrintBar(false);
+  // if (debug) oledPrintFPS();
+  // oledPrintBattery(batteryLevel, true);
+  u8g2.setDrawColor(1);
+  u8g2.drawRFrame(0, 0, 63, 25, 3);
+  u8g2.drawRFrame(65, 0, 63, 25, 3);
+  u8g2.drawRFrame(0, 27, 63, 25, 3);
+  u8g2.drawRFrame(65, 27, 63, 25, 3);
+
+  u8g2.setFont(primaryFont);
+  u8g2.setCursor(column1 - (u8g2.getStrWidth((String(thrust) + String(" g")).c_str())), row1 + primaryFontHeight);
+  u8g2.print(thrust);  // thrust
+  u8g2.print(" g");
+  u8g2.setFont(secondaryFont);
+  u8g2.setCursor(column1 - (u8g2.getStrWidth((String(thrustMax) + String(" g")).c_str())), row1 + primaryFontHeight + spacing + secondaryFontHeight);
+  u8g2.print(thrustMax);  // thrust max
+  u8g2.print(" g");
+
+  u8g2.setFont(primaryFont);
+  u8g2.setCursor(column1 - (u8g2.getStrWidth(String(RPM).c_str())), row2 + primaryFontHeight);
+  u8g2.print(RPM);  // rpm
+  u8g2.setFont(secondaryFont);
+  u8g2.setCursor(column1 - (u8g2.getStrWidth(String(RPMMax).c_str())), row2 + primaryFontHeight + spacing + secondaryFontHeight);
+  u8g2.print(RPMMax);  // rpm max
+
+  u8g2.setFont(primaryFont);
+  u8g2.setCursor(column2 - (u8g2.getStrWidth((String(extBatVolt) + String(" V")).c_str())), row1 + primaryFontHeight);
+  u8g2.print(extBatVolt);  // volt
+  u8g2.print(" V");
+  u8g2.setFont(secondaryFont);
+  u8g2.setCursor(column2 - (u8g2.getStrWidth((String(extBatVoltMax) + String(" V")).c_str())), row1 + primaryFontHeight + spacing + secondaryFontHeight);
+  u8g2.print(extBatVoltMax);  // volt max
+  u8g2.print(" V");
+
+  u8g2.setFont(primaryFont);
+  u8g2.setCursor(column2 - (u8g2.getStrWidth((String(extBatAmp) + String(" A")).c_str())), row2 + primaryFontHeight);
+  u8g2.print(extBatAmp);  // amp
+  u8g2.print(" A");
+  u8g2.setFont(secondaryFont);
+  u8g2.setCursor(column2 - (u8g2.getStrWidth((String(extBatAmpMax) + String(" A")).c_str())), row2 + primaryFontHeight + spacing + secondaryFontHeight);
+  u8g2.print(extBatAmpMax);  // amp max
+  u8g2.print(" A");
+
+  u8g2.setFont(titleFont);
+  u8g2.setCursor(titleColumn1, (5 + row1 + titleFontHeight));
+  u8g2.print("EMP");
+  u8g2.setCursor(titleColumn1, (5 + row2 + titleFontHeight));
+  u8g2.print("RPM");
+  u8g2.setCursor(titleColumn2, (5 + row1 + titleFontHeight));
+  u8g2.print("V");
+  u8g2.setCursor(titleColumn2 + 2, (5 + row2 + titleFontHeight));
+  u8g2.print("I");
   u8g2.sendBuffer();
 }
 
@@ -346,6 +470,7 @@ void oledPrintBattery(int level, bool showPercentage) {
 }
 
 void oledPrintBar(bool showNumber, bool convertToPercentage) {
+  u8g2.setDrawColor(1);
   u8g2.drawXBMP(0, 54, bottom_bar_width, bottom_bar_height, bottom_bar_bits);
   int barWidth = map(motorPWM, MIN_PWM_VAL, MAX_PWM_VAL, 0, 122);
   if (barWidth < 3) barWidth = 3;
@@ -370,36 +495,52 @@ void oledPrintBar(bool showNumber, bool convertToPercentage) {
 
 void oledPrintMenu() {
   u8g2.clearBuffer();
-  u8g2.setDrawColor(1);
-  u8g2.setFont(u8g2_font_simple1_tf);
-  u8g2.drawBox(0, 18, 128, 30);
+  oledPrintBattery(intBatVolt, true);
+  u8g2.setCursor(0, 4);
+  u8g2.print("13:42");
 
-  if (currentMenuIndex != 0) {
-    u8g2.drawXBMP(10, 4, up_arrow_width, up_arrow_height, up_arrow_bits);
-    u8g2.setCursor(27, 11);
-    u8g2.print(menuItem[currentMenuIndex - 1]);
-  }
-  if (currentMenuIndex != MENU_SIZE - 1) {
-    u8g2.drawXBMP(10, 54, down_arrow_width, down_arrow_height, down_arrow_bits);
-    u8g2.setCursor(27, 61);
-    u8g2.print(menuItem[currentMenuIndex + 1]);
-  }
-  u8g2.setDrawColor(0);
-  switch (currentMenuIndex) {
+  switch (displayMenuSelected) {
     case 0:
-      u8g2.drawXBMP(5, 22, return_width, return_height, return_bits);
+      u8g2.drawFrame(0, menuItem0Y - 10, 128, 13);
       break;
     case 1:
-      u8g2.drawXBMP(5, 22, start_width, start_height, start_bits);
+      u8g2.drawFrame(0, menuItem1Y - 10, 128, 13);
       break;
     case 2:
-      u8g2.drawXBMP(5, 22, cog_width, cog_height, cog_bits);
+      u8g2.drawFrame(0, menuItem2Y - 10, 128, 13);
+      break;
+    case 3:
+      u8g2.drawFrame(0, menuItem3Y - 10, 128, 13);
       break;
   }
-  u8g2.setFont(u8g2_font_pixzillav1_te);
-  u8g2.setCursor(32, 38);
-  u8g2.print(menuItem[currentMenuIndex]);
-  u8g2.setDrawColor(1);
+
+  if (displayMenuIndex + 3 < MENU_SIZE - 1) {
+    u8g2.drawXBMP(64 - (down_arrow_width / 2), 64 - down_arrow_height, down_arrow_width, down_arrow_height, down_arrow_bits);
+    // u8g2.drawXBMP(10, 64 - down_arrow_height, down_arrow_width, down_arrow_height, down_arrow_bits);
+  }
+
+  if (displayMenuIndex > 0) {
+    u8g2.drawXBMP(64 - (up_arrow_width / 2), 0, up_arrow_width, up_arrow_height, up_arrow_bits);
+    // u8g2.drawXBMP(10, 0, up_arrow_width, up_arrow_height, up_arrow_bits);
+  }
+
+  u8g2.setFont(menuFont);
+  u8g2.setCursor(menuItemSideMargin, menuItem0Y);
+  u8g2.print(menuItem[displayMenuIndex]);
+  u8g2.setCursor(128 - menuItemSideMargin - (u8g2.getStrWidth(String(menuItemValue[displayMenuIndex]).c_str())), menuItem0Y);
+  u8g2.print(menuItemValue[displayMenuIndex]);
+  u8g2.setCursor(menuItemSideMargin, menuItem1Y);
+  u8g2.print(menuItem[displayMenuIndex + 1]);
+  u8g2.setCursor(128 - menuItemSideMargin - (u8g2.getStrWidth(String(menuItemValue[displayMenuIndex + 1]).c_str())), menuItem1Y);
+  u8g2.print(menuItemValue[displayMenuIndex + 1]);
+  u8g2.setCursor(menuItemSideMargin, menuItem2Y);
+  u8g2.print(menuItem[displayMenuIndex + 2]);
+  u8g2.setCursor(128 - menuItemSideMargin - (u8g2.getStrWidth(String(menuItemValue[displayMenuIndex + 2]).c_str())), menuItem2Y);
+  u8g2.print(menuItemValue[displayMenuIndex + 2]);
+  u8g2.setCursor(menuItemSideMargin, menuItem3Y);
+  u8g2.print(menuItem[displayMenuIndex + 3]);
+  u8g2.setCursor(128 - menuItemSideMargin - (u8g2.getStrWidth(String(menuItemValue[displayMenuIndex + 3]).c_str())), menuItem3Y);
+  u8g2.print(menuItemValue[displayMenuIndex + 3]);
   u8g2.sendBuffer();
 }
 
@@ -412,9 +553,6 @@ void readThrust() {
     trustLastMillis = millis();
     if (Load.wait_ready_timeout(1000)) {
       thrust = Load.get_units(1);
-      if (debug) Serial.print("Weight: ");
-      if (debug) Serial.print(thrust, 10);
-      if (debug) Serial.println("g");
     } else {
       if (debug) Serial.println("HX711 not found");
     }
@@ -434,7 +572,8 @@ void readADCs() {
     rawExtBatAmp += analogRead(CURRENT_SENSOR);
     if (ADCReadingCount == ADC_N_READINGS) {
       ADCReadingCount = 0;
-      intBatVolt = mapFloat(rawIntBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * INT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
+      // intBatVolt = mapFloat(rawIntBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * INT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
+      intBatVolt = map(rawIntBatVolt / ADC_N_READINGS, 0, 4095, 0, 100);
       extBatVolt = mapFloat(rawExtBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * EXT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
       extBatAmp = (mapFloat(rawExtBatAmp / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * ADCVoltFactor - CURRENT_QOV + CURRENT_OFFSET) * CURRENT_SENS;
       rawIntBatVolt = 0;
