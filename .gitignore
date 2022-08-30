@@ -4,3 +4,4 @@
 .vscode/launch.json
 .vscode/ipch
 webpack/node_modules
+webpack/dist
