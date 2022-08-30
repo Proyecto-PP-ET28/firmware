@@ -13,43 +13,49 @@
 #include <WiFiUdp.h>
 #include <qrcode.h>
 
-#include "Arduino.h"
-#include "SPIFFS.h"
-#include "esp_adc_cal.h"
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
+#include "Arduino.h"
+#include "SPIFFS.h"
+#include "esp_adc_cal.h"
 
-//* Debug
-unsigned long millis_time;
-unsigned long millis_time_last;
-float fps;
-int ms;
+// * ---------------------------------------------------------------------- * //
+// *                               Globales                                 * //
+// * ---------------------------------------------------------------------- * //
 
-//* Variables globales
 bool clientIsConnected = 1;
 int batteryLevel = 0;
 bool isSliderDown = false;
 unsigned long millisRandomRPM;
 
-//* Credenciales WiFi
-#define WIFI_STATUS 2   // BUILT-IN LED en GPIO 2
+// * ---------------------------------------------------------------------- * //
+// *                               Debugging                                * //
+// * ---------------------------------------------------------------------- * //
 
-// TODO: Descomentar lo que corresponda
-const char *LOCAL_SSID = "300 de paleta";
-const char *LOCAL_PASS = "berenjenas";
-// const char *LOCAL_SSID = ""; 
-// const char *LOCAL_PASS = "";
+unsigned long millis_time;
+unsigned long millis_time_last;
+float fps;
+int ms;
 
+// * ---------------------------------------------------------------------- * //
+// *                                 WiFi                                   * //
+// * ---------------------------------------------------------------------- * //
 
+#define WIFI_STATUS 2 // LED en GPIO 2
 
+// Credenciales
+const char *LOCAL_SSID = "Fibertel WiFi666 2.4GHz";
+const char *LOCAL_PASS = "0044304973";
 
-//* Display (OLED)
-#define OLED_SCL 26
-#define OLED_SDA 25
-#define OLED_RES 33
-#define OLED_DC 32
-#define OLED_CS 80  // No conectado
+// * ---------------------------------------------------------------------- * //
+// *                              Display (OLED)                            * //
+// * ---------------------------------------------------------------------- * //
+// #define OLED_SCL 26
+// #define OLED_SDA 25
+// #define OLED_RES 33
+// #define OLED_DC 32
+// #define OLED_CS 80  // N/C
 
 #define primaryFont u8g2_font_NokiaSmallBold_tr
 #define secondaryFont u8g2_font_smallsimple_tr
@@ -69,18 +75,22 @@ const char *LOCAL_PASS = "berenjenas";
 #define titleColumn2 68
 #define spacing 4
 
-//* Encoder (EN)
-#define EN_CLK 27
-#define EN_DT 14
-#define EN_SW 13
-
-//* Botón
-#define DEBOUNCE_TIME 30
+// * ---------------------------------------------------------------------- * //
+// *                               Encoder (EN)                             * //
+// * ---------------------------------------------------------------------- * //
+ 
+#define EN_CLK 13
+#define EN_DT 12
+#define EN_SW 14
+#define DEBOUNCE_TIME 30    // Botón
 
 unsigned long debounceMillis = 0;
 bool btnState = true;
 
-//* Celda de carga (LOAD)
+// * ---------------------------------------------------------------------- * //
+// *                          Celda de Carga (LOAD)                         * //
+// * ---------------------------------------------------------------------- * //
+
 #define LOAD_SCK 0
 #define LOAD_DT 4
 #define LOAD_CAL_VALUE -435
@@ -90,8 +100,11 @@ unsigned long trustLastMillis = 0;
 int thrust = 0;
 int thrustMax = 0;
 
-//* Sensor IR
-#define IR_SENSOR 16
+// * ---------------------------------------------------------------------- * //
+// *                               Sensor IR                                * //
+// * ---------------------------------------------------------------------- * //
+
+#define IR_SENSOR 3
 
 const byte PulsesPerRevolution = 2;                               // Establece cuántos pulsos hay en cada revolución. Default: 2.
 const unsigned long ZeroTimeout = 100000;                         // Para un mayor tiempo de respuesta, un buen valor sería 100000.
@@ -124,16 +137,21 @@ unsigned long readIndex;              // The index of the current reading.
 unsigned long total;                  // The running total.
 unsigned long average;                // The RPM value after applying the smoothing.
 
+// * ---------------------------------------------------------------------- * //
+// *                                 ESC                                    * //
+// * ---------------------------------------------------------------------- * //
 
-//* ESC
-#define ESC_PWM 22
+#define ESC_PWM 1       
 #define ESC_INIT_TIME 1500
 #define MIN_PWM_VAL 0
 #define MAX_PWM_VAL 180
 
 int motorPWM = 0;
 
-//* ADCs
+// * ---------------------------------------------------------------------- * //
+// *                                 ADCs                                   * //
+// * ---------------------------------------------------------------------- * //
+
 #define INT_BAT 36
 #define EXT_BAT 39
 #define CURRENT_SENSOR 34
@@ -161,11 +179,11 @@ float extBatAmp = 0;
 float extBatVoltMax = 0;
 float extBatAmpMax = 0;
 
+// * ---------------------------------------------------------------------- * //
+// *                                 Menú                                   * //
+// * ---------------------------------------------------------------------- * //
 
-
-//* Menú
 #define MENU_SIZE 8
-
 #define menuItem0Y 19
 #define menuItem1Y 30
 #define menuItem2Y 41
@@ -179,15 +197,9 @@ int displayMenuIndex = 0;
 int displayMenuSelected = 0;
 bool isMenuOpen = false;
 
-//* Tarjeta SD
-// TODO: Implementar pointers?
-// unsigned long * average_buffer = &average;       //RPM
-
-
-
-//! -------------------------------------------------------------------------- !//
-//!                                  FUNCIONES                                 !//
-//! -------------------------------------------------------------------------- !//
+// * -------------------------------------------------------------------------- * //
+// *                                 FUNCIONES                                  * //
+// * -------------------------------------------------------------------------- * //
 
 String getCurrentValues();
 void initFS();
@@ -211,32 +223,23 @@ void oledPrintMenu();
 void initADC();
 void readADCs();
 float mapFloat(float x, float inMin, float inMax, float outMin, float outMax);
-void tachometer();
 void initSD(); 
 void saveDataToSD();
-void listDir(fs::FS &fs, const char * dirname, uint8_t levels);
-void createDir(fs::FS &fs, const char * path);
-void removeDir(fs::FS &fs, const char * path);
-void readFile(fs::FS &fs, const char * path);
-void writeFile(fs::FS &fs, const char * path, const char * message);
 void appendFile(fs::FS &fs, const char * path, const char * message);
-void renameFile(fs::FS &fs, const char * path1, const char * path2);
-void deleteFile(fs::FS &fs, const char * path);
-void testFileIO(fs::FS &fs, const char * path);
 
-
-//! -------------------------------------------------------------------------- !//
-//!                                   BITMAPS                                  !//
-//! -------------------------------------------------------------------------- !//
+// * -------------------------------------------------------------------------- * //
+// *                                 BITMAPS                                    * //
+// * -------------------------------------------------------------------------- * //
 
 #define battery_width 10
 #define battery_height 6
-static const unsigned char battery_bits[] U8X8_PROGMEM = {
+
+const unsigned char battery_bits[] U8X8_PROGMEM = {
     0xfe, 0x00, 0x01, 0x01, 0x01, 0x03, 0x01, 0x03, 0x01, 0x01, 0xfe, 0x00};
 
 #define bottom_bar_width 128
 #define bottom_bar_height 10
-static const unsigned char bottom_bar_bits[] U8X8_PROGMEM = {
+static unsigned char bottom_bar_bits[] U8X8_PROGMEM = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00,
