@@ -1,8 +1,9 @@
-#include "declarations.h"
+#include "main.hpp"
 
-bool debug = true;  // TODO: Habilitar/Deshabilitar debugging
+bool debug = true;              // TODO: Habilita o deshabilita debugging, según corresponda.
 
-U8G2_SH1106_128X64_NONAME_F_4W_SW_SPI u8g2(U8G2_R0, OLED_SCL, OLED_SDA, OLED_CS, OLED_DC, OLED_RES);
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+// ! U8G2_SH1106_128X64_NONAME_F_4W_SW_SPI u8g2(U8G2_R0, 23, 12, 11, 8, 9); //* reset=*/ U8X8_PIN_NONE);
 MD_REncoder Encoder = MD_REncoder(EN_CLK, EN_DT);
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
@@ -12,9 +13,9 @@ QRCode qrcode;
 HX711 Load;
 Servo ESC;
 
-//! -------------------------------------------------------------------------- !//
-//!                               INTERRUPCIONES                               !//
-//! -------------------------------------------------------------------------- !//
+// * -------------------------------------------------------------------------- * //
+// *                               INTERRUPCIONES                               * //
+// * --------------------------------------------------------------------------- * //
 
 void IRAM_ATTR Ext_INT1_ISR() {  // PWM utilizando Encoder por interrupción
   uint8_t rotation = Encoder.read();
@@ -126,10 +127,9 @@ void IRAM_ATTR Ext_INT3_ISR()  // The interrupt runs this to calculate the perio
 
 }  // End of Pulse_Even
 
-
-//! -------------------------------------------------------------------------- !//
-//!                                    MAIN                                    !//
-//! -------------------------------------------------------------------------- !//
+// * -------------------------------------------------------------------------- * //
+// *                                    MAIN                                    * //
+// * -------------------------------------------------------------------------- * //
 
 void setup() {
   Serial.begin(115200);
@@ -139,12 +139,12 @@ void setup() {
   oledPrintInitScreen();
   initADC();
   initFS();
-  initWiFi();  // Conexión WiFi
+  initWiFi();
   initWebSocket();
-  initServer();    // Server: Requests al Server
-  initOTA();       // Actualizaciones OTA
-  initLoadCell();  // Celda de carga
-  initSD();
+  initServer();                   // Server: Requests al Server
+  initOTA();
+  // initSD();                       
+  initLoadCell();
 
   pinMode(WIFI_STATUS, OUTPUT);
   pinMode(EN_CLK, INPUT);
@@ -159,9 +159,7 @@ void setup() {
   delay(1000);  // We sometimes take several readings of the period to average. Since we don't have any readings
                 // stored we need a high enough value in micros() so if divided is not going to give negative values.
                 // The delay allows the micros() to be high enough for the first few cycles.
-  
 
-  // RPM = 9000;
 }
 
 void loop() {
@@ -170,8 +168,8 @@ void loop() {
   ESC.write(motorPWM);
   readThrust();
   readADCs();
-  tachometer();
-
+  // tachometer();
+ 
   if (thrust > thrustMax) thrustMax = thrust;
   if (RPM > RPMMax) RPMMax = RPM;
   if (extBatVolt > extBatVoltMax) extBatVoltMax = extBatVolt;
@@ -199,9 +197,9 @@ void loop() {
   }
 }
 
-//! -------------------------------------------------------------------------- !//
-//!                                    INITS                                   !//
-//! -------------------------------------------------------------------------- !//
+// * -------------------------------------------------------------------------- * //
+// *                                    INITS                                   * //
+// * -------------------------------------------------------------------------- * //
 
 void initADC() {
   esp_adc_cal_characteristics_t adc_chars;
@@ -236,7 +234,7 @@ void initWiFi() {
   //     Serial.println("Connection successful");
   //   }
   // }
-  if (debug) Serial.printf("Conectando a %s\n", LOCAL_SSID);
+  if (debug) Serial.print("Connecting to WiFi...");
   while (WiFi.status() != WL_CONNECTED) {
     if (debug) Serial.print('.');
     delay(500);
@@ -356,10 +354,9 @@ void initSD(){
     }
 }
 
-
-//! -------------------------------------------------------------------------- !//
-//!                                  WEBSOCKET                                 !//
-//! -------------------------------------------------------------------------- !//
+// * -------------------------------------------------------------------------- * //
+// *                                  WEBSOCKET                                 * //
+// * -------------------------------------------------------------------------- * //
 
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
   switch (type) {
@@ -421,9 +418,9 @@ String getCurrentValues() {
   return jsonString;
 }
 
-//! -------------------------------------------------------------------------- !//
-//!                                    OLED                                    !//
-//! -------------------------------------------------------------------------- !//
+// * -------------------------------------------------------------------------- * //
+// *                                    OLED                                    * //
+// * -------------------------------------------------------------------------- * //
 
 void oledPrintFPS() {
   millis_time_last = millis_time;
@@ -471,8 +468,8 @@ void oledPrintMainScreen() {
   u8g2.print(" g");
 
   u8g2.setFont(primaryFont);
-  u8g2.setCursor(column1 - (u8g2.getStrWidth(String(RPM).c_str())), row2 + primaryFontHeight);
-  u8g2.print(RPM);  // rpm
+  u8g2.setCursor(column1 - (u8g2.getStrWidth(String(RPM/2).c_str())), row2 + primaryFontHeight);
+  u8g2.print(RPM/2);  // rpm
   u8g2.setFont(secondaryFont);
   u8g2.setCursor(column1 - (u8g2.getStrWidth(String(RPMMax).c_str())), row2 + primaryFontHeight + spacing + secondaryFontHeight);
   u8g2.print(RPMMax);  // rpm max
@@ -532,7 +529,7 @@ void oledPrintIP() {
 }
 
 void oledPrintBattery(int level, bool showPercentage) {
-  u8g2.drawXBMP(118, 0, battery_width, battery_height, battery_bits);
+  u8g2.drawXBM(118, 0, battery_width, battery_height, battery_bits);
   if (level >= 66) {
     u8g2.drawLine(124, 2, 124, 3);  // 100%
     u8g2.drawLine(122, 2, 122, 3);
@@ -558,7 +555,7 @@ void oledPrintBattery(int level, bool showPercentage) {
 
 void oledPrintBar(bool showNumber, bool convertToPercentage) {
   u8g2.setDrawColor(1);
-  u8g2.drawXBMP(0, 54, bottom_bar_width, bottom_bar_height, bottom_bar_bits);
+  u8g2.drawXBM(0, 54, bottom_bar_width, bottom_bar_height, bottom_bar_bits);
   int barWidth = map(motorPWM, MIN_PWM_VAL, MAX_PWM_VAL, 0, 122);
   if (barWidth < 3) barWidth = 3;
   if (motorPWM != 0) u8g2.drawRBox(3, 57, barWidth, 4, 1);
@@ -602,13 +599,13 @@ void oledPrintMenu() {
   }
 
   if (displayMenuIndex + 3 < MENU_SIZE - 1) {
-    u8g2.drawXBMP(64 - (down_arrow_width / 2), 64 - down_arrow_height, down_arrow_width, down_arrow_height, down_arrow_bits);
-    // u8g2.drawXBMP(10, 64 - down_arrow_height, down_arrow_width, down_arrow_height, down_arrow_bits);
+    u8g2.drawXBM(64 - (down_arrow_width / 2), 64 - down_arrow_height, down_arrow_width, down_arrow_height, down_arrow_bits);
+    // u8g2.drawXBM(10, 64 - down_arrow_height, down_arrow_width, down_arrow_height, down_arrow_bits);
   }
 
   if (displayMenuIndex > 0) {
-    u8g2.drawXBMP(64 - (up_arrow_width / 2), 0, up_arrow_width, up_arrow_height, up_arrow_bits);
-    // u8g2.drawXBMP(10, 0, up_arrow_width, up_arrow_height, up_arrow_bits);
+    u8g2.drawXBM(64 - (up_arrow_width / 2), 0, up_arrow_width, up_arrow_height, up_arrow_bits);
+    // u8g2.drawXBM(10, 0, up_arrow_width, up_arrow_height, up_arrow_bits);
   }
 
   u8g2.setFont(menuFont);
@@ -631,116 +628,13 @@ void oledPrintMenu() {
   u8g2.sendBuffer();
 }
 
-//! -------------------------------------------------------------------------- !//
-//!                                  SENSORES                                  !//
-//! -------------------------------------------------------------------------- !//
 
-void readThrust() {
-  if (millis() > trustLastMillis + THRUST_READING_DELAY) {
-    trustLastMillis = millis();
-    if (Load.wait_ready_timeout(1000)) {
-      thrust = Load.get_units(1);
-    } else {
-      if (debug) Serial.println("HX711 not found");
-    }
-  }
-}
-
-float mapFloat(float x, float inMin, float inMax, float outMin, float outMax) {
-  return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
-}
-
-void readADCs() {
-  if (millis() > ADCLastMillis + ADC_READING_DELAY) {
-    ADCLastMillis = millis();
-    ADCReadingCount++;
-    rawIntBatVolt += analogRead(INT_BAT);
-    rawExtBatVolt += analogRead(EXT_BAT);
-    rawExtBatAmp += analogRead(CURRENT_SENSOR);
-    if (ADCReadingCount == ADC_N_READINGS) {
-      ADCReadingCount = 0;
-      // intBatVolt = mapFloat(rawIntBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * INT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
-      intBatVolt = map(rawIntBatVolt / ADC_N_READINGS, 0, 4095, 0, 100);
-      extBatVolt = mapFloat(rawExtBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * EXT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
-      extBatAmp = (mapFloat(rawExtBatAmp / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * ADCVoltFactor - CURRENT_QOV + CURRENT_OFFSET) * CURRENT_SENS;
-      rawIntBatVolt = 0;
-      rawExtBatVolt = 0;
-      rawExtBatAmp = 0;
-    }
-  }
-}
-
-void tachometer(){
-    // The following is going to store the two values that might change in the middle of the cycle.
-  // We are going to do math and functions with those values and they can create glitches if they change in the
-  // middle of the cycle.
-  LastTimeCycleMeasure = LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
-  CurrentMicros = micros();                   // Store the micros() in a variable.
-
-  // CurrentMicros should always be higher than LastTimeWeMeasured, but in rare occasions that's not true.
-  // I'm not sure why this happens, but my solution is to compare both and if CurrentMicros is lower than
-  // LastTimeCycleMeasure I set it as the CurrentMicros.
-  // The need of fixing this is that we later use this information to see if pulses stopped.
-  if (CurrentMicros < LastTimeCycleMeasure) {
-    LastTimeCycleMeasure = CurrentMicros;
-  }
-
-  // Calculate the frequency:
-  FrequencyRaw = 10000000000 / PeriodAverage;  // Calculate the frequency using the period between pulses.
-
-  // Detect if pulses stopped or frequency is too low, so we can show 0 Frequency:
-  if (PeriodBetweenPulses > ZeroTimeout - ZeroDebouncingExtra || CurrentMicros - LastTimeCycleMeasure > ZeroTimeout - ZeroDebouncingExtra) {  // If the pulses are too far apart that we reached the timeout for zero:
-    FrequencyRaw = 0;                                                                                                                         // Set frequency as 0.
-    ZeroDebouncingExtra = 2000;                                                                                                               // Change the threshold a little so it doesn't bounce.
-  } else {
-    ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
-  }
-
-  FrequencyReal = FrequencyRaw / 10000;  // Get frequency without decimals.
-                                         // This is not used to calculate RPM but we remove the decimals just in case
-                                         // you want to print it.
-
-  // Calculate the RPM:
-  RPM = FrequencyRaw / PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
-                                                  // 60 seconds to get minutes.
-  RPM = RPM / 10000;                              // Remove the decimals.
-
-  // Smoothing RPM:
-  total = total - readings[readIndex];  // Advance to the next position in the array.
-  readings[readIndex] = RPM;            // Takes the value that we are going to smooth.
-  total = total + readings[readIndex];  // Add the reading to the total.
-  readIndex = readIndex + 1;            // Advance to the next position in the array.
-
-  if (readIndex >= numReadings)  // If we're at the end of the array:
-  {
-    readIndex = 0;  // Reset array index.
-  }
-
-  // Calculate the average:
-  average = total / numReadings;  // The average value it's the smoothed result.
-
-  // Print information on the serial monitor:
-  // Comment this section if you have a display and you don't need to monitor the values on the serial monitor.
-  // This is because disabling this section would make the loop run faster.
-  // Serial.print("Period: ");
-  // Serial.print(PeriodBetweenPulses);
-  // Serial.print("\tReadings: ");
-  // Serial.print(AmountOfReadings);
-  // Serial.print("\tFrequency: ");
-  // Serial.print(FrequencyReal);
-  Serial.print("RPM: ");
-  Serial.println(RPM/2);
-  Serial.print("  Tachometer: ");
-  Serial.println(average);
-  // End of tachometre
-}
-
-//! -------------------------------------------------------------------------- !//
-//!                            FUNCIONES DE LA SD                              !//
-//! -------------------------------------------------------------------------- !//
+// * -------------------------------------------------------------------------- * //
+// *                            FUNCIONES DE LA SD                              * //
+// * -------------------------------------------------------------------------- * //
 
 void saveDataToCard(){
-  // TODO: Implementar pointers?
+  // TODO: Implementar pointers
   String data = "{\n\t\"RPM\":\"" + String(average)+
                  "\n\t\"RPM MAX\":\"" + String(RPMMax)+
                  "\n\t\"Empuje\":\"" + String(thrust)+
@@ -751,7 +645,7 @@ void saveDataToCard(){
                  "\n\t\"Corriente MAX\":\"" + String(extBatAmpMax)+
                   "\"\n}\n";
 
-  appendFile(SD, "/test/data.json", data.c_str());
+  appendFile(SD, "/test/test.json", data.c_str());
 }
 
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
@@ -915,4 +809,108 @@ void testFileIO(fs::FS &fs, const char * path){
     end = millis() - start;
     Serial.printf("%u bytes written for %u ms\n", 2048 * 512, end);
     file.close();
+}
+
+// * -------------------------------------------------------------------------- * //
+// *                                  SENSORES                                  * //
+// * -------------------------------------------------------------------------- * //
+
+void readThrust(){
+  if (millis() > trustLastMillis + THRUST_READING_DELAY) {
+    trustLastMillis = millis();
+    if (Load.wait_ready_timeout(1000)) {
+      thrust = Load.get_units(1);
+    } else {
+      if (debug) Serial.println("HX711 not found");
+    }
+  }
+}
+
+float mapFloat(float x, float inMin, float inMax, float outMin, float outMax) {
+  return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
+
+void readADCs(){
+  if (millis() > ADCLastMillis + ADC_READING_DELAY) {
+    ADCLastMillis = millis();
+    ADCReadingCount++;
+    rawIntBatVolt += analogRead(INT_BAT);
+    rawExtBatVolt += analogRead(EXT_BAT);
+    rawExtBatAmp += analogRead(CURRENT_SENSOR);
+    if (ADCReadingCount == ADC_N_READINGS) {
+      ADCReadingCount = 0;
+      // intBatVolt = mapFloat(rawIntBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * INT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
+      intBatVolt = map(rawIntBatVolt / ADC_N_READINGS, 0, 4095, 0, 100);
+      extBatVolt = mapFloat(rawExtBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * EXT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
+      extBatAmp = (mapFloat(rawExtBatAmp / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * ADCVoltFactor - CURRENT_QOV + CURRENT_OFFSET) * CURRENT_SENS;
+      rawIntBatVolt = 0;
+      rawExtBatVolt = 0;
+      rawExtBatAmp = 0;
+    }
+  }
+}
+
+void tachometer(){
+    // The following is going to store the two values that might change in the middle of the cycle.
+  // We are going to do math and functions with those values and they can create glitches if they change in the
+  // middle of the cycle.
+  LastTimeCycleMeasure = LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
+  CurrentMicros = micros();                   // Store the micros() in a variable.
+
+  // CurrentMicros should always be higher than LastTimeWeMeasured, but in rare occasions that's not true.
+  // I'm not sure why this happens, but my solution is to compare both and if CurrentMicros is lower than
+  // LastTimeCycleMeasure I set it as the CurrentMicros.
+  // The need of fixing this is that we later use this information to see if pulses stopped.
+  if (CurrentMicros < LastTimeCycleMeasure) {
+    LastTimeCycleMeasure = CurrentMicros;
+  }
+
+  // Calculate the frequency:
+  FrequencyRaw = 10000000000 / PeriodAverage;  // Calculate the frequency using the period between pulses.
+
+  // Detect if pulses stopped or frequency is too low, so we can show 0 Frequency:
+  if (PeriodBetweenPulses > ZeroTimeout - ZeroDebouncingExtra || CurrentMicros - LastTimeCycleMeasure > ZeroTimeout - ZeroDebouncingExtra) {  // If the pulses are too far apart that we reached the timeout for zero:
+    FrequencyRaw = 0;                                                                                                                         // Set frequency as 0.
+    ZeroDebouncingExtra = 2000;                                                                                                               // Change the threshold a little so it doesn't bounce.
+  } else {
+    ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
+  }
+
+  FrequencyReal = FrequencyRaw / 10000;  // Get frequency without decimals.
+                                         // This is not used to calculate RPM but we remove the decimals just in case
+                                         // you want to print it.
+
+  // Calculate the RPM:
+  RPM = FrequencyRaw / PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
+                                                  // 60 seconds to get minutes.
+  RPM = RPM / 10000;                              // Remove the decimals.
+
+  // Smoothing RPM:
+  total = total - readings[readIndex];  // Advance to the next position in the array.
+  readings[readIndex] = RPM;            // Takes the value that we are going to smooth.
+  total = total + readings[readIndex];  // Add the reading to the total.
+  readIndex = readIndex + 1;            // Advance to the next position in the array.
+
+  if (readIndex >= numReadings)  // If we're at the end of the array:
+  {
+    readIndex = 0;  // Reset array index.
+  }
+
+  // Calculate the average:
+  average = total / numReadings;  // The average value it's the smoothed result.
+
+  // Print information on the serial monitor:
+  // Comment this section if you have a display and you don't need to monitor the values on the serial monitor.
+  // This is because disabling this section would make the loop run faster.
+  // Serial.print("Period: ");
+  // Serial.print(PeriodBetweenPulses);
+  // Serial.print("\tReadings: ");
+  // Serial.print(AmountOfReadings);
+  // Serial.print("\tFrequency: ");
+  // Serial.print(FrequencyReal);
+  Serial.print("RPM: ");
+  Serial.println(RPM/2);
+  Serial.print("  Tachometer: ");
+  Serial.println(average);
+  // End of tachometre
 }
