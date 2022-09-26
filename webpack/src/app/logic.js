@@ -1,4 +1,5 @@
 import WS from './websocket';
+import Dev from './development';
 import UI from './UI';
 import v from './variables';
 import s from './states';
@@ -6,39 +7,40 @@ import s from './states';
 const measurementUpdateInterval = 100;
 export const pwmUpdateInterval = 20;
 const batteryUpdateInterval = 500;
+let isDev = false;
 
 export default class Update {
-  static initAll() {
+  static initAll(dev) {
+    isDev = dev;
     this.thrust();
     this.rpm();
     this.volt();
     this.amp();
-    this.pwm();
     this.battery();
+    !isDev && this.pwm();
   }
   static thrust() {
-    WS.getThrust();
+    isDev ? Dev.getThrust() : WS.getThrust();
     UI.updateMeasurement('thrust');
     setTimeout(Update.thrust, measurementUpdateInterval);
   }
   static rpm() {
-    WS.getRpm();
+    isDev ? Dev.getRpm() : WS.getRpm();
     UI.updateMeasurement('rpm');
     setTimeout(Update.rpm, measurementUpdateInterval);
   }
   static volt() {
-    WS.getVolt();
+    isDev ? Dev.getVolt() : WS.getVolt();
     UI.updateMeasurement('volt');
     setTimeout(Update.volt, measurementUpdateInterval);
   }
   static amp() {
-    WS.getAmp();
+    isDev ? Dev.getAmp() : WS.getAmp();
     UI.updateMeasurement('amp');
     setTimeout(Update.amp, measurementUpdateInterval);
   }
   static pwm() {
     if (!s.arePwmControlsActive) {
-      WS.getPwm();
       document.getElementById('slider').value = v.pwm;
       document.getElementById('pwm-input').value = v.pwm;
       UI.drawSliderFill();
@@ -46,7 +48,7 @@ export default class Update {
     setTimeout(Update.pwm, pwmUpdateInterval);
   }
   static battery() {
-    WS.getBattery();
+    isDev ? Dev.getBattery() : WS.getBattery();
     UI.updateBattery();
     setTimeout(Update.battery, batteryUpdateInterval);
   }
