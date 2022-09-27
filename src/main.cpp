@@ -2,6 +2,7 @@
 
 bool debug = true;  // TODO: Habilitar/Deshabilitar debugging
 
+Preferences config;
 U8G2_SH1106_128X64_NONAME_F_4W_SW_SPI u8g2(U8G2_R0, OLED_SCL, OLED_SDA, OLED_CS, OLED_DC, OLED_RES);
 MD_REncoder Encoder = MD_REncoder(EN_CLK, EN_DT);
 AsyncWebServer server(80);
@@ -16,13 +17,38 @@ Servo ESC;
 //!                               INTERRUPCIONES                               !//
 //! -------------------------------------------------------------------------- !//
 
-void IRAM_ATTR Ext_INT1_ISR() {  // PWM utilizando Encoder por interrupción
+void IRAM_ATTR Ext_INT1_ISR() {  // Rotación del encoder
   uint8_t rotation = Encoder.read();
   if (rotation) {
-    if (rotation == 16) {  // izquierda
+    if (rotation == 16) {  // Izquierda
+      if (qrIsVisible) return;
       if (!isMenuOpen) {
         if (!isSliderDown) motorPWM -= 9;
         if (motorPWM < MIN_PWM_VAL) motorPWM = MIN_PWM_VAL;
+      } else if (isEditingValue) {
+        switch (currentMenuIndex) {
+          //* Cantidad de palas
+          case 5:
+            if (bladesNum > 2) {
+              bladesNum--;
+              menuItemValue[currentMenuIndex] = String(bladesNum);
+            }
+            break;
+
+            //* PWM min
+          case 6:
+            if (minPwmIndex > 0) {
+              minPwmIndex--;
+            }
+            break;
+
+            //* PWM max
+          case 7:
+            if (maxPwmIndex > 0) {
+              maxPwmIndex--;
+            }
+            break;
+        }
       } else {
         if (currentMenuIndex > 0) {
           currentMenuIndex--;
@@ -34,10 +60,35 @@ void IRAM_ATTR Ext_INT1_ISR() {  // PWM utilizando Encoder por interrupción
         }
       }
 
-    } else if (rotation == 32) {  // derecha
+    } else if (rotation == 32) {  // Derecha
+      if (qrIsVisible) return;
       if (!isMenuOpen) {
         if (!isSliderDown) motorPWM += 9;
         if (motorPWM > MAX_PWM_VAL) motorPWM = MAX_PWM_VAL;
+      } else if (isEditingValue) {
+        switch (currentMenuIndex) {
+          //* Cantidad de palas
+          case 5:
+            if (bladesNum < 6) {
+              bladesNum++;
+              menuItemValue[currentMenuIndex] = String(bladesNum);
+            }
+            break;
+
+            //* PWM min
+          case 6:
+            if (minPwmIndex < 20) {
+              minPwmIndex++;
+            }
+            break;
+
+            //* PWM max
+          case 7:
+            if (maxPwmIndex < 20) {
+              maxPwmIndex++;
+            }
+            break;
+        }
       } else {
         if (currentMenuIndex < MENU_SIZE - 1) {
           currentMenuIndex++;
@@ -52,36 +103,96 @@ void IRAM_ATTR Ext_INT1_ISR() {  // PWM utilizando Encoder por interrupción
   }
 }
 
-void IRAM_ATTR Ext_INT2_ISR() {  // Switch del Encoder
-  // TODO : Incluir en el menú una opción para medir, y guardar los datos a la SD
+void IRAM_ATTR Ext_INT2_ISR() {  // Botón del encoder
   if (!digitalRead(EN_SW) && btnState && millis() > debounceMillis + DEBOUNCE_TIME) {
     debounceMillis = millis();
     btnState = false;
-
+    if (qrIsVisible) {
+      qrIsVisible = false;
+      return;
+    }
     switch (currentMenuIndex) {
+        //* < Volver
       case 0:
         isMenuOpen = !isMenuOpen;
+        if (!isMenuOpen) {
+          menuItemValue[1] = "";
+          menuItemValue[2] = "";
+          menuItemValue[3] = "";
+        }
         break;
+
+        //* Capturar
       case 1:
-        if (menuItemValue[currentMenuIndex] == "ON") {
-          menuItemValue[currentMenuIndex] = "OFF";
-        } else {
-          menuItemValue[currentMenuIndex] = "ON";
-        }
+        menuItemValue[1] = checkGlyph;
         break;
+
+        //* Tare
       case 2:
-        if (menuItemValue[currentMenuIndex] == "ON") {
-          menuItemValue[currentMenuIndex] = "OFF";
-        } else {
-          menuItemValue[currentMenuIndex] = "ON";
+        triggerTare = true;
+        menuItemValue[2] = checkGlyph;
+        break;
+
+        //* Reiniciar max
+      case 3:
+        RPMMax = 0;
+        thrustMax = 0;
+        extBatVoltMax = 0;
+        extBatAmpMax = 0;
+        menuItemValue[3] = checkGlyph;
+        break;
+
+        //* Mostrar IP / Codigo QR
+      case 4:
+        qrIsVisible = true;
+        break;
+
+        //* Cantidad de palas
+      case 5:
+        isEditingValue = !isEditingValue;
+        if (!isEditingValue) {
+          config.putInt("bladesNum", bladesNum);
         }
         break;
-      case 3:
-        if (menuItemValue[currentMenuIndex] == "ON") {
+
+        //* PWM min
+      case 6:
+        isEditingValue = !isEditingValue;
+        if (!isEditingValue) {
+          config.putInt("minPwmIndex", minPwmIndex);
+        }
+        break;
+
+        //* PWM max
+      case 7:
+        isEditingValue = !isEditingValue;
+        if (!isEditingValue) {
+          config.putInt("maxPwmIndex", maxPwmIndex);
+        }
+        break;
+
+        //* Mostrar maximos
+      case 8:
+        if (displayPeek) {
+          displayPeek = false;
           menuItemValue[currentMenuIndex] = "OFF";
         } else {
+          displayPeek = true;
           menuItemValue[currentMenuIndex] = "ON";
         }
+        config.putBool("displayPeek", displayPeek);
+        break;
+
+        //* Mostrar tiempo real
+      case 9:
+        if (displayRealTime) {
+          displayRealTime = false;
+          menuItemValue[currentMenuIndex] = "OFF";
+        } else {
+          displayRealTime = true;
+          menuItemValue[currentMenuIndex] = "ON";
+        }
+        config.putBool("displayRealTime", displayRealTime);
         break;
     }
   }
@@ -90,7 +201,6 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Switch del Encoder
     btnState = true;
   }
 }
-
 void IRAM_ATTR Ext_INT3_ISR()  // The interrupt runs this to calculate the period between pulses:
 {
   PeriodBetweenPulses = micros() - LastTimeWeMeasured;  // Current "micros" minus the old "micros" when the last pulse happens.
@@ -126,17 +236,18 @@ void IRAM_ATTR Ext_INT3_ISR()  // The interrupt runs this to calculate the perio
 
 }  // End of Pulse_Even
 
-
 //! -------------------------------------------------------------------------- !//
 //!                                    MAIN                                    !//
 //! -------------------------------------------------------------------------- !//
 
 void setup() {
   Serial.begin(115200);
+  config.begin("config", false);
   u8g2.begin();
   ESC.attach(ESC_PWM);
   Encoder.begin();
   oledPrintInitScreen();
+  initConfig();
   initADC();
   initFS();
   initWiFi();  // Conexión WiFi
@@ -145,8 +256,8 @@ void setup() {
   initOTA();       // Actualizaciones OTA
   initLoadCell();  // Celda de carga
   initSD();
-
   pinMode(WIFI_STATUS, OUTPUT);
+
   pinMode(EN_CLK, INPUT);
   pinMode(EN_DT, INPUT);
   pinMode(EN_SW, INPUT);
@@ -156,12 +267,9 @@ void setup() {
   attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
   attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT3_ISR, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
-  delay(1000);  // We sometimes take several readings of the period to average. Since we don't have any readings
-                // stored we need a high enough value in micros() so if divided is not going to give negative values.
-                // The delay allows the micros() to be high enough for the first few cycles.
-  
-
-  // RPM = 9000;
+  delay(1000);                                                              // We sometimes take several readings of the period to average. Since we don't have any readings
+                                                                            // stored we need a high enough value in micros() so if divided is not going to give negative values.
+                                                                            // The delay allows the micros() to be high enough for the first few cycles.
 }
 
 void loop() {
@@ -171,6 +279,22 @@ void loop() {
   readThrust();
   readADCs();
   tachometer();
+  if (triggerTare) {
+    triggerTare = false;
+    Load.tare();
+  }
+
+  if (minPwmIndex != lastMinPwmIndex) {
+    lastMinPwmIndex = minPwmIndex;
+    minPwmMs = minPwmVals[minPwmIndex];
+    menuItemValue[6] = String(minPwmMs);
+  }
+
+  if (maxPwmIndex != lastMaxPwmIndex) {
+    lastMaxPwmIndex = maxPwmIndex;
+    maxPwmMs = maxPwmVals[maxPwmIndex];
+    menuItemValue[7] = String(maxPwmMs);
+  }
 
   if (thrust > thrustMax) thrustMax = thrust;
   if (RPM > RPMMax) RPMMax = RPM;
@@ -188,7 +312,7 @@ void loop() {
   }
 
   batteryLevel = intBatVolt;
-  if (clientIsConnected) {
+  if (!qrIsVisible) {
     if (isMenuOpen) {
       oledPrintMenu();
     } else {
@@ -314,48 +438,76 @@ void initOTA() {
   ArduinoOTA.begin();
 }
 
-void initSD(){
-    //Antes que nada, debe chequear si la SD se inicializó bien.
+void initConfig() {
+  bladesNum = config.getInt("bladesNum", bladesNum);
+  menuItemValue[5] = String(bladesNum);
 
-    if(!SD.begin()){    //Si la SD no inicializó correctamente
-        Serial.println("No se pudo montar la tarjeta"); //imprime mensaje de error.
-        return;
-    }
-    else{
-        uint8_t cardType = SD.cardType();                       //Se define el tipo de SD,
-        uint64_t cardSize = SD.cardSize() / (1024 * 1024);      //el tamaño,
-        uint64_t totalBytes = SD.totalBytes() / (1024 * 1024);  //el espacio total
-        uint64_t usedBytes = SD.usedBytes() / (1024 * 1024);    //y el espacio utilizado.
+  const int minIndex = config.getInt("minPwmIndex", minPwmIndex);
+  minPwmIndex = minIndex;
+  lastMinPwmIndex = minIndex;
+  minPwmMs = minPwmVals[minIndex];
+  menuItemValue[6] = String(minPwmMs);
 
-        Serial.printf("\nINFORMACIÓN DE LA TARJETA: \n");
+  const int maxIndex = config.getInt("maxPwmIndex", maxPwmIndex);
+  maxPwmIndex = maxIndex;
+  lastMaxPwmIndex = maxIndex;
+  maxPwmMs = maxPwmVals[maxIndex];
+  menuItemValue[7] = String(maxPwmMs);
 
-        Serial.print(" Tipo: ");  //Tipo de tarjeta.
-        switch (cardType){
-            case CARD_NONE:
-                Serial.println("No se insertó una tarjeta SD");
-                break;
-            case CARD_MMC:
-                Serial.println("MMC");
-                break;
-            case CARD_SD:
-                Serial.println("SDSC");
-                break;
-            case CARD_SDHC:
-                Serial.println("SDHC");
-                break;
-            default:
-                Serial.println("DESCONOCIDO");
-                break;
-        }         //Printea el tipo de SD.
+  displayPeek = config.getBool("displayPeek", displayPeek);
+  if (displayPeek) menuItemValue[8] = "ON";
+  if (!displayPeek) menuItemValue[8] = "OFF";
 
-        Serial.printf(" Tamaño: %llu MB\n", cardSize);  //Verifica el tamaño de la SD.
-        Serial.printf(" Espacio utilizado: %llu MB de %llu MB\n", usedBytes, totalBytes); //Printea el espacio utilizado del total.
-        Serial.printf("\n");
-    
-        return;
-    }
+  displayRealTime = config.getBool("displayRealTime", displayRealTime);
+  if (displayRealTime) menuItemValue[9] = "ON";
+  if (!displayRealTime) menuItemValue[9] = "OFF";
+
+  Serial.println(bladesNum);
+  Serial.println(minPwmMs);
+  Serial.println(maxPwmMs);
+  Serial.println(displayPeek);
+  Serial.println(displayRealTime);
 }
+void initSD() {
+  // Antes que nada, debe chequear si la SD se inicializó bien.
 
+  if (!SD.begin()) {                                 // Si la SD no inicializó correctamente
+    Serial.println("No se pudo montar la tarjeta");  // imprime mensaje de error.
+    return;
+  } else {
+    uint8_t cardType = SD.cardType();                       // Se define el tipo de SD,
+    uint64_t cardSize = SD.cardSize() / (1024 * 1024);      // el tamaño,
+    uint64_t totalBytes = SD.totalBytes() / (1024 * 1024);  // el espacio total
+    uint64_t usedBytes = SD.usedBytes() / (1024 * 1024);    // y el espacio utilizado.
+
+    Serial.printf("\nINFORMACIÓN DE LA TARJETA: \n");
+
+    Serial.print(" Tipo: ");  // Tipo de tarjeta.
+    switch (cardType) {
+      case CARD_NONE:
+        Serial.println("No se insertó una tarjeta SD");
+        break;
+      case CARD_MMC:
+        Serial.println("MMC");
+        break;
+      case CARD_SD:
+        Serial.println("SDSC");
+        break;
+      case CARD_SDHC:
+        Serial.println("SDHC");
+        break;
+      default:
+        Serial.println("DESCONOCIDO");
+        break;
+    }  // Printea el tipo de SD.
+
+    Serial.printf(" Tamaño: %llu MB\n", cardSize);                                     // Verifica el tamaño de la SD.
+    Serial.printf(" Espacio utilizado: %llu MB de %llu MB\n", usedBytes, totalBytes);  // Printea el espacio utilizado del total.
+    Serial.printf("\n");
+
+    return;
+  }
+}
 
 //! -------------------------------------------------------------------------- !//
 //!                                  WEBSOCKET                                 !//
@@ -364,12 +516,12 @@ void initSD(){
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
   switch (type) {
     case WS_EVT_CONNECT:
-      clientIsConnected = 1;
+      qrIsVisible = true;
       if (debug) Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
       break;
     case WS_EVT_DISCONNECT:
       if (debug) Serial.printf("WebSocket client #%u disconnected\n", client->id());
-      clientIsConnected = 0;
+      qrIsVisible = false;
       break;
     case WS_EVT_DATA:
       handleWebSocketMessage(arg, data, len);
@@ -465,32 +617,30 @@ void oledPrintMainScreen() {
   u8g2.setCursor(column1 - (u8g2.getStrWidth((String(thrust) + String(" g")).c_str())), row1 + primaryFontHeight);
   u8g2.print(thrust);  // thrust
   u8g2.print(" g");
+
+  u8g2.setCursor(column1 - (u8g2.getStrWidth(String(RPM).c_str())), row2 + primaryFontHeight);
+  u8g2.print(RPM);  // rpm
+
+  u8g2.setCursor(column2 - (u8g2.getStrWidth((String(extBatVolt) + String(" V")).c_str())), row1 + primaryFontHeight);
+  u8g2.print(extBatVolt);  // volt
+  u8g2.print(" V");
+
+  u8g2.setCursor(column2 - (u8g2.getStrWidth((String(extBatAmp) + String(" A")).c_str())), row2 + primaryFontHeight);
+  u8g2.print(extBatAmp);  // amp
+  u8g2.print(" A");
+
   u8g2.setFont(secondaryFont);
   u8g2.setCursor(column1 - (u8g2.getStrWidth((String(thrustMax) + String(" g")).c_str())), row1 + primaryFontHeight + spacing + secondaryFontHeight);
   u8g2.print(thrustMax);  // thrust max
   u8g2.print(" g");
 
-  u8g2.setFont(primaryFont);
-  u8g2.setCursor(column1 - (u8g2.getStrWidth(String(RPM).c_str())), row2 + primaryFontHeight);
-  u8g2.print(RPM);  // rpm
-  u8g2.setFont(secondaryFont);
   u8g2.setCursor(column1 - (u8g2.getStrWidth(String(RPMMax).c_str())), row2 + primaryFontHeight + spacing + secondaryFontHeight);
   u8g2.print(RPMMax);  // rpm max
 
-  u8g2.setFont(primaryFont);
-  u8g2.setCursor(column2 - (u8g2.getStrWidth((String(extBatVolt) + String(" V")).c_str())), row1 + primaryFontHeight);
-  u8g2.print(extBatVolt);  // volt
-  u8g2.print(" V");
-  u8g2.setFont(secondaryFont);
   u8g2.setCursor(column2 - (u8g2.getStrWidth((String(extBatVoltMax) + String(" V")).c_str())), row1 + primaryFontHeight + spacing + secondaryFontHeight);
   u8g2.print(extBatVoltMax);  // volt max
   u8g2.print(" V");
 
-  u8g2.setFont(primaryFont);
-  u8g2.setCursor(column2 - (u8g2.getStrWidth((String(extBatAmp) + String(" A")).c_str())), row2 + primaryFontHeight);
-  u8g2.print(extBatAmp);  // amp
-  u8g2.print(" A");
-  u8g2.setFont(secondaryFont);
   u8g2.setCursor(column2 - (u8g2.getStrWidth((String(extBatAmpMax) + String(" A")).c_str())), row2 + primaryFontHeight + spacing + secondaryFontHeight);
   u8g2.print(extBatAmpMax);  // amp max
   u8g2.print(" A");
@@ -501,7 +651,7 @@ void oledPrintMainScreen() {
   u8g2.setCursor(titleColumn1, (5 + row2 + titleFontHeight));
   u8g2.print("RPM");
   u8g2.setCursor(titleColumn2, (5 + row1 + titleFontHeight));
-  u8g2.print("V");
+  u8g2.print("T");
   u8g2.setCursor(titleColumn2 + 2, (5 + row2 + titleFontHeight));
   u8g2.print("I");
   u8g2.sendBuffer();
@@ -588,15 +738,31 @@ void oledPrintMenu() {
 
   switch (displayMenuSelected) {
     case 0:
+      if (isEditingValue) {
+        const int width = 128 - (menuItemSideMargin * 4) - (u8g2.getStrWidth(String(menuItemValue[currentMenuIndex]).c_str()));
+        u8g2.drawBox(width, menuItem0Y - 10, width, 13);
+      }
       u8g2.drawFrame(0, menuItem0Y - 10, 128, 13);
       break;
     case 1:
+      if (isEditingValue) {
+        const int width = 128 - (menuItemSideMargin * 4) - (u8g2.getStrWidth(String(menuItemValue[currentMenuIndex]).c_str()));
+        u8g2.drawBox(width, menuItem1Y - 10, width, 13);
+      }
       u8g2.drawFrame(0, menuItem1Y - 10, 128, 13);
       break;
     case 2:
+      if (isEditingValue) {
+        const int width = 128 - (menuItemSideMargin * 4) - (u8g2.getStrWidth(String(menuItemValue[currentMenuIndex]).c_str()));
+        u8g2.drawBox(width, menuItem2Y - 10, width, 13);
+      }
       u8g2.drawFrame(0, menuItem2Y - 10, 128, 13);
       break;
     case 3:
+      if (isEditingValue) {
+        const int width = 128 - (menuItemSideMargin * 4) - (u8g2.getStrWidth(String(menuItemValue[currentMenuIndex]).c_str()));
+        u8g2.drawBox(width, menuItem3Y - 10, width, 13);
+      }
       u8g2.drawFrame(0, menuItem3Y - 10, 128, 13);
       break;
   }
@@ -612,22 +778,34 @@ void oledPrintMenu() {
   }
 
   u8g2.setFont(menuFont);
+
   u8g2.setCursor(menuItemSideMargin, menuItem0Y);
   u8g2.print(menuItem[displayMenuIndex]);
+  if (isEditingValue && displayMenuSelected == 0) u8g2.setDrawColor(0);
   u8g2.setCursor(128 - menuItemSideMargin - (u8g2.getStrWidth(String(menuItemValue[displayMenuIndex]).c_str())), menuItem0Y);
   u8g2.print(menuItemValue[displayMenuIndex]);
+  u8g2.setDrawColor(1);
+
   u8g2.setCursor(menuItemSideMargin, menuItem1Y);
   u8g2.print(menuItem[displayMenuIndex + 1]);
+  if (isEditingValue && displayMenuSelected == 1) u8g2.setDrawColor(0);
   u8g2.setCursor(128 - menuItemSideMargin - (u8g2.getStrWidth(String(menuItemValue[displayMenuIndex + 1]).c_str())), menuItem1Y);
   u8g2.print(menuItemValue[displayMenuIndex + 1]);
+  u8g2.setDrawColor(1);
+
   u8g2.setCursor(menuItemSideMargin, menuItem2Y);
   u8g2.print(menuItem[displayMenuIndex + 2]);
+  if (isEditingValue && displayMenuSelected == 2) u8g2.setDrawColor(0);
   u8g2.setCursor(128 - menuItemSideMargin - (u8g2.getStrWidth(String(menuItemValue[displayMenuIndex + 2]).c_str())), menuItem2Y);
   u8g2.print(menuItemValue[displayMenuIndex + 2]);
+  u8g2.setDrawColor(1);
+
   u8g2.setCursor(menuItemSideMargin, menuItem3Y);
   u8g2.print(menuItem[displayMenuIndex + 3]);
+  if (isEditingValue && displayMenuSelected == 3) u8g2.setDrawColor(0);
   u8g2.setCursor(128 - menuItemSideMargin - (u8g2.getStrWidth(String(menuItemValue[displayMenuIndex + 3]).c_str())), menuItem3Y);
   u8g2.print(menuItemValue[displayMenuIndex + 3]);
+  u8g2.setDrawColor(1);
   u8g2.sendBuffer();
 }
 
@@ -670,8 +848,8 @@ void readADCs() {
   }
 }
 
-void tachometer(){
-    // The following is going to store the two values that might change in the middle of the cycle.
+void tachometer() {
+  // The following is going to store the two values that might change in the middle of the cycle.
   // We are going to do math and functions with those values and they can create glitches if they change in the
   // middle of the cycle.
   LastTimeCycleMeasure = LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
@@ -729,7 +907,7 @@ void tachometer(){
   // Serial.print("\tFrequency: ");
   // Serial.print(FrequencyReal);
   Serial.print("RPM: ");
-  Serial.println(RPM/2);
+  Serial.println(RPM / 2);
   Serial.print("  Tachometer: ");
   Serial.println(average);
   // End of tachometre
@@ -739,180 +917,179 @@ void tachometer(){
 //!                            FUNCIONES DE LA SD                              !//
 //! -------------------------------------------------------------------------- !//
 
-void saveDataToCard(){
+void saveDataToCard() {
   // TODO: Implementar pointers?
-  String data = "{\n\t\"RPM\":\"" + String(average)+
-                 "\n\t\"RPM MAX\":\"" + String(RPMMax)+
-                 "\n\t\"Empuje\":\"" + String(thrust)+
-                 "\n\t\"Empuje MAX\":\"" + String(thrustMax)+
-                 "\n\t\"Voltaje\":\"" + String(extBatVolt)+
-                 "\n\t\"Voltaje MAX\":\"" + String(extBatVoltMax)+
-                 "\n\t\"Corriente\":\"" + String(extBatAmp)+
-                 "\n\t\"Corriente MAX\":\"" + String(extBatAmpMax)+
-                  "\"\n}\n";
+  String data = "{\n\t\"RPM\":\"" + String(average) +
+                "\n\t\"RPM MAX\":\"" + String(RPMMax) +
+                "\n\t\"Empuje\":\"" + String(thrust) +
+                "\n\t\"Empuje MAX\":\"" + String(thrustMax) +
+                "\n\t\"Voltaje\":\"" + String(extBatVolt) +
+                "\n\t\"Voltaje MAX\":\"" + String(extBatVoltMax) +
+                "\n\t\"Corriente\":\"" + String(extBatAmp) +
+                "\n\t\"Corriente MAX\":\"" + String(extBatAmpMax) +
+                "\"\n}\n";
 
   appendFile(SD, "/test/data.json", data.c_str());
 }
 
-void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
+void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
+  Serial.printf("Listando %s:\n", dirname);
 
-    Serial.printf("Listando %s:\n", dirname);
+  File root = fs.open(dirname);
+  if (!root) {
+    Serial.println("No se pudo abrir el directorio");
+    return;
+  }
+  if (!root.isDirectory()) {
+    Serial.printf("%s no es un directorio\n", dirname);
+    return;
+  }
 
-    File root = fs.open(dirname);
-    if(!root){
-        Serial.println("No se pudo abrir el directorio");
-        return;
-    }
-    if(!root.isDirectory()){
-        Serial.printf("%s no es un directorio\n", dirname);
-        return;
-    }
+  File file = root.openNextFile();
+  const char *fileName = file.name();
+  unsigned int fileSizeInMB = file.size() / (1024 * 1024);
+  unsigned int fileSizeInKB = file.size() / 1024;
 
-    File file = root.openNextFile();
-    const char* fileName = file.name();
-    unsigned int fileSizeInMB = file.size() / (1024 * 1024);
-    unsigned int fileSizeInKB = file.size() / 1024;
-    
-    while(file){
-        if(file.isDirectory() && file.name() != "System Volume Information"){
-            Serial.printf("\t📁 %s\n", fileName);
-            if(levels){
-                listDir(fs, file.path(), levels -1);
-            }
-        } 
-        else {
-            if(fileSizeInMB < 1) {
-                if(fileSizeInKB < 1) Serial.printf("\t🗎 %s %u B\n", fileName, file.size());
-                else Serial.printf("\t🗎 %s %u KB\n", fileName, fileSizeInKB);
-            }
-            else Serial.printf("\t🗎 %s %u MB\n", fileName, fileSizeInMB);
-        }
-        file = root.openNextFile();
-    }
-}
-
-void createDir(fs::FS &fs, const char * path){
-    Serial.printf("Creating Dir: %s\n", path);
-    if(fs.mkdir(path)){
-        Serial.println("Dir created");
+  while (file) {
+    if (file.isDirectory() && file.name() != "System Volume Information") {
+      Serial.printf("\t📁 %s\n", fileName);
+      if (levels) {
+        listDir(fs, file.path(), levels - 1);
+      }
     } else {
-        Serial.println("mkdir failed");
+      if (fileSizeInMB < 1) {
+        if (fileSizeInKB < 1)
+          Serial.printf("\t🗎 %s %u B\n", fileName, file.size());
+        else
+          Serial.printf("\t🗎 %s %u KB\n", fileName, fileSizeInKB);
+      } else
+        Serial.printf("\t🗎 %s %u MB\n", fileName, fileSizeInMB);
     }
+    file = root.openNextFile();
+  }
 }
 
-void removeDir(fs::FS &fs, const char * path){
-    Serial.printf("Removing Dir: %s\n", path);
-    if(fs.rmdir(path)){
-        Serial.println("Dir removed");
-    } else {
-        Serial.println("rmdir failed");
-    }
+void createDir(fs::FS &fs, const char *path) {
+  Serial.printf("Creating Dir: %s\n", path);
+  if (fs.mkdir(path)) {
+    Serial.println("Dir created");
+  } else {
+    Serial.println("mkdir failed");
+  }
 }
 
-void readFile(fs::FS &fs, const char * path){
-    Serial.printf("Reading file: %s\n", path);
-
-    File file = fs.open(path);
-    if(!file){
-        Serial.println("Failed to open file for reading");
-        return;
-    }
-
-    Serial.print("Read from file: \n");
-    while(file.available()){
-        Serial.write(file.read());
-    }
-    file.close();
+void removeDir(fs::FS &fs, const char *path) {
+  Serial.printf("Removing Dir: %s\n", path);
+  if (fs.rmdir(path)) {
+    Serial.println("Dir removed");
+  } else {
+    Serial.println("rmdir failed");
+  }
 }
 
-void writeFile(fs::FS &fs, const char * path, const char * message){
-    Serial.printf("Writing file: %s\n", path);
+void readFile(fs::FS &fs, const char *path) {
+  Serial.printf("Reading file: %s\n", path);
 
-    File file = fs.open(path, FILE_WRITE);
-    if(!file){
-        Serial.println("Failed to open file for writing");
-        return;
-    }
-    if(file.print(message)){
-        Serial.println("File written");
-    } else {
-        Serial.println("Write failed");
-    }
-    file.close();
+  File file = fs.open(path);
+  if (!file) {
+    Serial.println("Failed to open file for reading");
+    return;
+  }
+
+  Serial.print("Read from file: \n");
+  while (file.available()) {
+    Serial.write(file.read());
+  }
+  file.close();
 }
 
-void appendFile(fs::FS &fs, const char * path, const char * message){
-    Serial.printf("Appending to file: %s\n", path);
+void writeFile(fs::FS &fs, const char *path, const char *message) {
+  Serial.printf("Writing file: %s\n", path);
 
-    File file = fs.open(path, FILE_APPEND);
-    if(!file){
-        Serial.println("Failed to open file for appending");
-        return;
-    }
-    if(file.print(message)){
-        Serial.println("Message appended");
-    } else {
-        Serial.println("Append failed");
-    }
-    file.close();
+  File file = fs.open(path, FILE_WRITE);
+  if (!file) {
+    Serial.println("Failed to open file for writing");
+    return;
+  }
+  if (file.print(message)) {
+    Serial.println("File written");
+  } else {
+    Serial.println("Write failed");
+  }
+  file.close();
 }
 
-void renameFile(fs::FS &fs, const char * path1, const char * path2){
-    Serial.printf("Renaming file %s to %s\n", path1, path2);
-    if (fs.rename(path1, path2)) {
-        Serial.println("File renamed");
-    } else {
-        Serial.println("Rename failed");
-    }
+void appendFile(fs::FS &fs, const char *path, const char *message) {
+  Serial.printf("Appending to file: %s\n", path);
+
+  File file = fs.open(path, FILE_APPEND);
+  if (!file) {
+    Serial.println("Failed to open file for appending");
+    return;
+  }
+  if (file.print(message)) {
+    Serial.println("Message appended");
+  } else {
+    Serial.println("Append failed");
+  }
+  file.close();
 }
 
-void deleteFile(fs::FS &fs, const char * path){
-    Serial.printf("Deleting file: %s\n", path);
-    if(fs.remove(path)){
-        Serial.println("File deleted");
-    } else {
-        Serial.println("Delete failed");
-    }
+void renameFile(fs::FS &fs, const char *path1, const char *path2) {
+  Serial.printf("Renaming file %s to %s\n", path1, path2);
+  if (fs.rename(path1, path2)) {
+    Serial.println("File renamed");
+  } else {
+    Serial.println("Rename failed");
+  }
 }
 
-void testFileIO(fs::FS &fs, const char * path){
-    File file = fs.open(path);
-    static uint8_t buf[512];
-    size_t len = 0;
-    uint32_t start = millis();
-    uint32_t end = start;
-    if(file){
-        len = file.size();
-        size_t flen = len;
-        start = millis();
-        while(len){
-            size_t toRead = len;
-            if(toRead > 512){
-                toRead = 512;
-            }
-            file.read(buf, toRead);
-            len -= toRead;
-        }
-        end = millis() - start;
-        Serial.printf("%u bytes read for %u ms\n", flen, end);
-        file.close();
-    } else {
-        Serial.println("Failed to open file for reading");
-    }
+void deleteFile(fs::FS &fs, const char *path) {
+  Serial.printf("Deleting file: %s\n", path);
+  if (fs.remove(path)) {
+    Serial.println("File deleted");
+  } else {
+    Serial.println("Delete failed");
+  }
+}
 
-
-    file = fs.open(path, FILE_WRITE);
-    if(!file){
-        Serial.println("Failed to open file for writing");
-        return;
-    }
-
-    size_t i;
+void testFileIO(fs::FS &fs, const char *path) {
+  File file = fs.open(path);
+  static uint8_t buf[512];
+  size_t len = 0;
+  uint32_t start = millis();
+  uint32_t end = start;
+  if (file) {
+    len = file.size();
+    size_t flen = len;
     start = millis();
-    for(i=0; i<2048; i++){
-        file.write(buf, 512);
+    while (len) {
+      size_t toRead = len;
+      if (toRead > 512) {
+        toRead = 512;
+      }
+      file.read(buf, toRead);
+      len -= toRead;
     }
     end = millis() - start;
-    Serial.printf("%u bytes written for %u ms\n", 2048 * 512, end);
+    Serial.printf("%u bytes read for %u ms\n", flen, end);
     file.close();
+  } else {
+    Serial.println("Failed to open file for reading");
+  }
+
+  file = fs.open(path, FILE_WRITE);
+  if (!file) {
+    Serial.println("Failed to open file for writing");
+    return;
+  }
+
+  size_t i;
+  start = millis();
+  for (i = 0; i < 2048; i++) {
+    file.write(buf, 512);
+  }
+  end = millis() - start;
+  Serial.printf("%u bytes written for %u ms\n", 2048 * 512, end);
+  file.close();
 }

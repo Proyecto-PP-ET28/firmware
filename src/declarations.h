@@ -12,6 +12,7 @@
 #include <WiFiManager.h>
 #include <WiFiUdp.h>
 #include <qrcode.h>
+#include <Preferences.h>
 
 #include "Arduino.h"
 #include "SPIFFS.h"
@@ -33,16 +34,10 @@ bool isSliderDown = false;
 unsigned long millisRandomRPM;
 
 //* Credenciales WiFi
-#define WIFI_STATUS 2   // BUILT-IN LED en GPIO 2
-
-// TODO: Descomentar lo que corresponda
+// const char *LOCAL_SSID = "Fibertel WiFi617 2.4GHz";
+// const char *LOCAL_PASS = "0041781818";
 const char *LOCAL_SSID = "300 de paleta";
 const char *LOCAL_PASS = "berenjenas";
-// const char *LOCAL_SSID = ""; 
-// const char *LOCAL_PASS = "";
-
-
-
 
 //* Display (OLED)
 #define OLED_SCL 26
@@ -55,6 +50,8 @@ const char *LOCAL_PASS = "berenjenas";
 #define secondaryFont u8g2_font_smallsimple_tr
 #define titleFont u8g2_font_nokiafc22_tu
 #define menuFont u8g2_font_NokiaSmallPlain_tf
+
+String checkGlyph = "#";
 
 #define primaryFontHeight 7
 #define secondaryFontHeight 6
@@ -74,25 +71,19 @@ const char *LOCAL_PASS = "berenjenas";
 #define EN_DT 14
 #define EN_SW 13
 
-//* Botón
-#define DEBOUNCE_TIME 30
-
-unsigned long debounceMillis = 0;
-bool btnState = true;
-
 //* Celda de carga (LOAD)
 #define LOAD_SCK 0
 #define LOAD_DT 4
 #define LOAD_CAL_VALUE -435
 #define THRUST_READING_DELAY 200
-
 unsigned long trustLastMillis = 0;
 int thrust = 0;
 int thrustMax = 0;
 
 //* Sensor IR
 #define IR_SENSOR 16
-
+int RPM = 0;
+int RPMMax = 0;
 const byte PulsesPerRevolution = 2;                               // Establece cuántos pulsos hay en cada revolución. Default: 2.
 const unsigned long ZeroTimeout = 100000;                         // Para un mayor tiempo de respuesta, un buen valor sería 100000.
 const byte numReadings = 2;                                       // Number of samples for smoothing. The higher, the more smoothing, but it's going to
@@ -125,12 +116,14 @@ unsigned long total;                  // The running total.
 unsigned long average;                // The RPM value after applying the smoothing.
 
 
+//* LED
+#define WIFI_STATUS 2
+
 //* ESC
 #define ESC_PWM 22
 #define ESC_INIT_TIME 1500
 #define MIN_PWM_VAL 0
 #define MAX_PWM_VAL 180
-
 int motorPWM = 0;
 
 //* ADCs
@@ -148,7 +141,6 @@ int motorPWM = 0;
 #define CURRENT_SENS 25
 #define CURRENT_OFFSET 0.095
 #define CURRENT_QOV 2.5
-
 unsigned long ADCLastMillis = 0;
 int ADCReadingCount = 0;
 float ADCVoltFactor = 0;
@@ -158,13 +150,22 @@ float rawExtBatAmp = 0;
 float intBatVolt = 0;
 float extBatVolt = 0;
 float extBatAmp = 0;
+
 float extBatVoltMax = 0;
 float extBatAmpMax = 0;
 
-
+//* Botón
+#define DEBOUNCE_TIME 30
+unsigned long debounceMillis = 0;
+bool btnState = true;
 
 //* Menú
-#define MENU_SIZE 8
+#define MENU_SIZE 10
+String menuItem[MENU_SIZE] = {"< Volver", "Capturar", "Tare", "Reiniciar max", "Mostrar IP / Codigo QR", "Cantidad de palas", "PWM min", "PWM max", "Mostrar maximos", "Mostrar tiempo real"};
+String menuItemValue[MENU_SIZE] = {"", "", "", "", "", "2", "1.00", "2.00", "ON", "ON"};
+int currentMenuIndex = 0;
+int displayMenuIndex = 0;
+int displayMenuSelected = 0;
 
 #define menuItem0Y 19
 #define menuItem1Y 30
@@ -172,18 +173,43 @@ float extBatAmpMax = 0;
 #define menuItem3Y 52
 #define menuItemSideMargin 3
 
-String menuItem[MENU_SIZE] = {"< Volver", "Item 2", "Item 3", "Item 4", "Item 5", "Item 6", "Item 7", "Item 8"};
-String menuItemValue[MENU_SIZE] = {"", "ON", "OFF", "ON", "1.25", "ON", "1", "4"};
-int currentMenuIndex = 0;
-int displayMenuIndex = 0;
-int displayMenuSelected = 0;
 bool isMenuOpen = false;
+bool isEditingValue = false;
+
+//* Config
+
+int bladesNum = 2;
+bool displayPeek = true;
+bool displayRealTime = true;
+
+float minPwmMs = 1.00;
+float maxPwmMs = 2.00;
+
+int minPwmIndex = 10;
+int lastMinPwmIndex = 10;
+int maxPwmIndex = 10;
+int lastMaxPwmIndex = 10;
+
+const float minPwmVals[21] = {0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15, 1.20, 1.25, 1.30, 1.35, 1.40, 1.45, 1.50};
+const float maxPwmVals[21] = {1.50, 1.55, 1.60, 1.65, 1.70, 1.75, 1.80, 1.85, 1.90, 1.95, 2.00, 2.05, 2.10, 2.15, 2.20, 2.25, 2.30, 2.35, 2.40, 2.45, 2.50};
+
+//* Variables globales
+bool qrIsVisible = true;
+int batteryLevel = 0;
+bool isSliderDown = false;
+unsigned long millisRandomRPM;
+
+bool triggerTare = false;
+
+//* Debug
+unsigned long millis_time;
+unsigned long millis_time_last;
+float fps;
+int ms;
 
 //* Tarjeta SD
 // TODO: Implementar pointers?
 // unsigned long * average_buffer = &average;       //RPM
-
-
 
 //! -------------------------------------------------------------------------- !//
 //!                                  FUNCIONES                                 !//
@@ -209,6 +235,7 @@ void oledPrintMainScreen();
 void readThrust();
 void oledPrintMenu();
 void initADC();
+void initConfig();
 void readADCs();
 float mapFloat(float x, float inMin, float inMax, float outMin, float outMax);
 void tachometer();
