@@ -301,15 +301,6 @@ void loop() {
   if (extBatVolt > extBatVoltMax) extBatVoltMax = extBatVolt;
   if (extBatAmp > extBatAmpMax) extBatAmpMax = extBatAmp;
 
-  if (millis() > millisRandomRPM + 250) {
-    millisRandomRPM = millis();
-    int randomVar = random(300);
-    if (random(2) == 1) {
-      RPM += randomVar;
-    } else {
-      RPM -= randomVar;
-    }
-  }
 
   batteryLevel = intBatVolt;
   if (!qrIsVisible) {
