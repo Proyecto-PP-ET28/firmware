@@ -21,18 +21,6 @@
 #include "SD.h"
 #include "SPI.h"
 
-//* Debug
-unsigned long millis_time;
-unsigned long millis_time_last;
-float fps;
-int ms;
-
-//* Variables globales
-bool clientIsConnected = 1;
-int batteryLevel = 0;
-bool isSliderDown = false;
-unsigned long millisRandomRPM;
-
 //* Credenciales WiFi
 // const char *LOCAL_SSID = "Fibertel WiFi617 2.4GHz";
 // const char *LOCAL_PASS = "0041781818";
@@ -82,8 +70,6 @@ int thrustMax = 0;
 
 //* Sensor IR
 #define IR_SENSOR 16
-int RPM = 0;
-int RPMMax = 0;
 const byte PulsesPerRevolution = 2;                               // Establece cuántos pulsos hay en cada revolución. Default: 2.
 const unsigned long ZeroTimeout = 100000;                         // Para un mayor tiempo de respuesta, un buen valor sería 100000.
 const byte numReadings = 2;                                       // Number of samples for smoothing. The higher, the more smoothing, but it's going to
