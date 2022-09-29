@@ -1,11 +1,11 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://i.imgur.com/kT6ZOKA.png">
-  <img height=140 align="right" alt="ESIMA logo" src="https://i.imgur.com/QVbBpEk.png">
+  <img height=140 align="right" alt="Logo de ESIMA" src="https://i.imgur.com/QVbBpEk.png">
 </picture>
 
 # Firmware
-> Este repo contine el código completo correspondiente al projecto ESIMA. Esto incluye la programación del μC y la interfaz web. 
+> Este repo contiene el código completo correspondiente al proyecto ESIMA. Esto incluye la programación del μC y la interfaz web. 
 <br/><br/>
 <img alt="Protoboard del prototipo" src="https://i.imgur.com/keabODI.jpg">
 
@@ -27,7 +27,7 @@ cd firmware
 pio run -t upload
 ```
 ## WebServer
-La interfáz web está programada con HTML, Sass y JavaScript utilizando WebPack como "Module Bundler". Una vez enpaquetado, los archivos son subidos directamene a la memoria interna del microcontrolador. Este repositorio incluye una versión pre-empaquetada del WebServer. Para recontruirlo es necesario instalar [NPM](https://www.npmjs.com).
+La interfaz web está programada con HTML, Sass y JavaScript utilizando WebPack como "Module Bundler". Una vez empaquetado, los archivos son subidos directamente a la memoria interna del microcontrolador. Este repositorio incluye una versión pre-empaquetada del WebServer. Para reconstruirlo es necesario instalar [NPM](https://www.npmjs.com).
 
 ### Sin rebuild
 
@@ -45,7 +45,7 @@ cd firmware
 ```bash
 pio run -t uploadfs
 ```
-
+----
 ### Con rebuild
 
 1.  Clonar este repositorio
@@ -67,10 +67,10 @@ cd webpack && npm install && npm run build && cd ..
 ```bash
 pio run -t uploadfs
 ```
-
+----
 ### Ejecutar en local
 
-> Cuando el servidor se ejecuta localmente, no tiene forma de acceder a los datos de los sensores por que genera valores aleatorios para simular este comportamiento.
+> Cuando el servidor se ejecuta localmente, no tiene forma de acceder a los datos de los sensores por lo que genera valores aleatorios para simular este comportamiento.
 
 1.  Clonar este repositorio
 ```bash
@@ -86,4 +86,4 @@ cd firmware
 ```bash
 cd webpack && npm install && npm start && cd ..
 ```
-> La interfáz por defecto en http://localhost:3000
+> La interfaz web se aloja por defecto en http://localhost:3000
