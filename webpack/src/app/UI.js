@@ -29,6 +29,7 @@ export default class UI {
       document.querySelector('.battery-icon-0').classList.add('active');
     }
   }
+
   static changeMenu(target) {
     const menuItem = document.querySelector('.menu-item.active');
     if (menuItem) menuItem.classList.remove('active');
@@ -37,5 +38,14 @@ export default class UI {
     if (container) container.classList.remove('active');
     const containerId = target.id.substring(0, target.id.indexOf('-'));
     document.getElementById(containerId).classList.add('active');
+  }
+
+  static updateSettings(settingsArray) {
+    document.getElementById('blades-num').value = settingsArray[0];
+    document.getElementById('display-real-time').checked = JSON.parse(settingsArray[1]);
+    document.getElementById('display-peak').checked = JSON.parse(settingsArray[2]);
+    document.getElementById('pwm-min').value = parseFloat(settingsArray[3], 10).toFixed(2);
+    document.getElementById('pwm-max').value = parseFloat(settingsArray[4], 10).toFixed(2);
+    document.getElementById('current-offset').value = parseFloat(settingsArray[5], 10).toFixed(3);
   }
 }

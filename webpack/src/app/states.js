@@ -1,3 +1,3 @@
 export default {
-arePwmControlsActive: false,
+  arePwmControlsActive: false,
 };

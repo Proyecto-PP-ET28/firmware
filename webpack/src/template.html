@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+    rel="icon"
+    href="./assets/favicons/favicon.svg"
+    id="dark-theme-icon"
+  />
+  <link
+    rel="icon"
+    href="./assets/favicons/favicon.svg"
+    id="light-theme-icon"
+  />
     <title>ESIMA</title>
   </head>
   <body>
@@ -33,12 +43,13 @@
         </div>
       </div>
       <div class="save">
-        <div class="title">GUARDAR</div>
+        <!-- <h2 class="title">GUARDAR</h2> -->
+        <button id="snapshot">Captura</button>
+        <!-- <h2 class="title">REINICIAR</h2> -->
         <div>
-          <button id="snapshot">Captura</button>
-          <button id="recording">Grabación</button>
+          <button id="reset-max">Máximos</button>
+          <button id="tare">Tare</button>
         </div>
-        <button id="reset-max">Reiniciar máximos</button>
       </div>
       <div class="pwm">
         <button id="stop">STOP</button>
@@ -117,6 +128,60 @@
       </div> 
     </div>
     <div class="main-container" id="measurements">Coming soon...<br>(~˘▾˘)~</div>
-    <div class="main-container" id="settings">Coming not that soon...<br>~(˘▾˘~)</div>
+    <div class="main-container" id="settings">
+      <form class="settings">
+        <h2>GENERAL</h2>
+        <div>
+           Número de palas
+          <select name="blades-num" id="blades-num">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+          </select>
+        </div>
+        <div>
+          Mostrar el valor en tiempo real
+          <label class="switch">
+            <input type="checkbox" name="display-real-time" id="display-real-time" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+        <div>
+          Mostrar el valor pico
+          <label class="switch">
+            <input type="checkbox" name="display-peak" id="display-peak" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+        <h2>CALIBRACIÓN</h2>
+        <div>
+          Valor PWM mínimo
+          <div class="num-input">
+            <button type="button" id="pwm-min-decrease">&#8722;</button>
+            <input type="number" name="pwm-min" id="pwm-min" step="0.05" min="0.50" max="1.50" value="1.00">
+            <button type="button"  id="pwm-min-increase">&#43;</button>
+          </div>
+        </div>
+        <div>
+          Valor PWM máximo
+          <div class="num-input">
+            <button type="button" id="pwm-max-decrease">&#8722;</button>            
+            <input type="number" name="pwm-max" id="pwm-max" step="0.05" min="1.50" max="2.50" value="2.00">
+            <button type="button"  id="pwm-max-increase">&#43;</button>
+          </div>
+        </div>
+        <div>
+          Factor de desfase
+          <div class="num-input">
+            <button type="button" id="current-offset-decrease">&#8722;</button>
+            <input type="number" name="current-offset" id="current-offset" step="0.005" min="0.050" max="0.150" value="0.100">
+            <button type="button"  id="current-offset-increase">&#43;</button>
+          </div>
+        </div>
+        <button type="submit">Guardar</button>
+      </form>
+    </div>
   </body>
 </html>

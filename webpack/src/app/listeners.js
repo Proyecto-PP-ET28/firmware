@@ -10,6 +10,10 @@ export default class BindEvent {
     this.buttons();
     this.menu();
     this.keyboard();
+    this.settingsForm();
+    this.settingsBtns('pwm-min');
+    this.settingsBtns('pwm-max');
+    this.settingsBtns('current-offset');
   }
   static pwm() {
     const slider = document.getElementById('slider');
@@ -93,16 +97,16 @@ export default class BindEvent {
   }
   static buttons() {
     const snapshot = document.getElementById('snapshot');
-    const recording = document.getElementById('recording');
     const resetMax = document.getElementById('reset-max');
+    const tare = document.getElementById('tare');
 
     snapshot.addEventListener('click', () => {
       console.log('SNAP');
       WS.sendString('SNAP');
     });
-    recording.addEventListener('click', () => {
-      console.log('REC');
-      WS.sendString('REC');
+    tare.addEventListener('click', () => {
+      console.log('TARE');
+      WS.sendString('TARE');
     });
     resetMax.addEventListener('click', () => {
       console.log('RST');
@@ -116,7 +120,9 @@ export default class BindEvent {
   static menu() {
     document.querySelectorAll('.menu-item').forEach((item) => {
       item.addEventListener('click', (e) => {
-        UI.changeMenu(e.target.closest('.menu-item'));
+        if (e.currentTarget.id === 'settings-menu')
+          WS.getSettings(e.currentTarget);
+        else UI.changeMenu(e.currentTarget);
       });
     });
   }
@@ -171,5 +177,58 @@ export default class BindEvent {
         document.getElementById('reset-max').click();
       }
     });
+  }
+
+  static settingsForm() {
+    document.querySelector('form.settings').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const bladesNumValue = document.getElementById('blades-num').value;
+      const displayRealTimeValue = (+ document.getElementById('display-real-time').checked).toString();
+      const displayPeakValue = (+ document.getElementById('display-peak').checked).toString();
+      const pwmMin = document.getElementById('pwm-min').value
+      const pwmMax = document.getElementById('pwm-max').value
+      const currentOffset = document.getElementById('current-offset').value
+      if (bladesNumValue !== v.lastSettingsArray[0]) {
+        WS.sendString(`SAVE_BLADES_NUM_${bladesNumValue}`);
+      }
+      if (displayRealTimeValue !== v.lastSettingsArray[1]){
+       WS.sendString(`SAVE_DISPLAY_REAL_TIME_${displayRealTimeValue}`);
+      }
+      if (displayPeakValue !== v.lastSettingsArray[2]){
+        WS.sendString(`SAVE_DISPLAY_PEAK_${displayPeakValue}`);
+       }
+       if (pwmMin !== v.lastSettingsArray[3]) {
+        WS.sendString(`SAVE_PWM_MIN_${pwmMin}`);
+      }
+      if (pwmMax !== v.lastSettingsArray[4]) {
+        WS.sendString(`SAVE_PWM_MAX_${pwmMax}`);
+      }
+      if (currentOffset !== v.lastSettingsArray[5]) {
+        WS.sendString(`SAVE_CURRENT_OFFSET_${currentOffset}`);
+      }
+    });
+  }
+
+  static settingsBtns(target) {
+    const input = document.getElementById(target);
+    const min = parseFloat(input.getAttribute('min'), 10);
+    const max = parseFloat(input.getAttribute('max'), 10);
+    const step = parseFloat(input.getAttribute('step'), 10);
+    document
+      .getElementById(`${target}-decrease`)
+      .addEventListener('click', () => {
+        let inputValue = parseFloat(input.value, 10);
+        inputValue -= step;
+        if (inputValue < min) inputValue = min;
+        input.value = inputValue.toFixed(target === 'current-offset' ? 3 : 2);
+      });
+    document
+      .getElementById(`${target}-increase`)
+      .addEventListener('click', () => {
+        let inputValue = parseFloat(input.value, 10);
+        inputValue += step;
+        if (inputValue > max) inputValue = max;
+        input.value = inputValue.toFixed(target === 'current-offset' ? 3 : 2);
+      });
   }
 }
