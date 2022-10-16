@@ -41,54 +41,6 @@ export default class WS {
     websocket.send(string);
   }
 
-  // static getThrust() {
-  //   const xhttp = new XMLHttpRequest();
-  //   xhttp.onreadystatechange = function () {
-  //     if (this.readyState == 4 && this.status == 200) {
-  //       v.thrust = parseInt(this.responseText, 10);
-  //       if (v.thrust > v.thrustMax) v.thrustMax = v.thrust;
-  //     }
-  //   };
-  //   xhttp.open('GET', '/thrust', true);
-  //   xhttp.send();
-  // }
-
-  // static getRpm() {
-  //   const xhttp = new XMLHttpRequest();
-  //   xhttp.onreadystatechange = function () {
-  //     if (this.readyState == 4 && this.status == 200) {
-  //       v.rpm = parseInt(this.responseText, 10);
-  //       if (v.rpm > v.rpmMax) v.rpmMax = v.rpm;
-  //     }
-  //   };
-  //   xhttp.open('GET', '/rpm', true);
-  //   xhttp.send();
-  // }
-
-  // static getVolt() {
-  //   const xhttp = new XMLHttpRequest();
-  //   xhttp.onreadystatechange = function () {
-  //     if (this.readyState == 4 && this.status == 200) {
-  //       v.volt = parseFloat(this.responseText, 10);
-  //       if (v.volt > v.voltMax) v.voltMax = v.volt;
-  //     }
-  //   };
-  //   xhttp.open('GET', '/volt', true);
-  //   xhttp.send();
-  // }
-
-  // static getAmp() {
-  //   const xhttp = new XMLHttpRequest();
-  //   xhttp.onreadystatechange = function () {
-  //     if (this.readyState == 4 && this.status == 200) {
-  //       v.amp = parseFloat(this.responseText, 10);
-  //       if (v.amp > v.ampMax) v.ampMax = v.amp;
-  //     }
-  //   };
-  //   xhttp.open('GET', '/amp', true);
-  //   xhttp.send();
-  // }
-
   static getPwm() {
     const xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function () {
@@ -134,11 +86,6 @@ export default class WS {
     };
     xhttp.open('GET', '/settings', true);
     xhttp.send();
-
-    // v.lastSettingsArray = ["4", "0", "0", "0.75", "2.25", "0.120"];
-    // UI.updateSettings(["4", "0", "0", "0.75", "2  .25", "0.120"]);
-    // UI.changeMenu(target);
-
   }
 
   static getBattery() {

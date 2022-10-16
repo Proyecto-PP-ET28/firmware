@@ -12,38 +12,10 @@ let dev = false;
 export default class Update {
   static initAll(isDev) {
     dev = isDev;
-    // this.thrust();
-    // this.rpm();
-    // this.volt();
-    // this.amp();
     this.data();
     this.battery();
     !dev && this.pwm();
   }
-
-  // static thrust() {
-  //   dev ? Dev.getThrust() : WS.getThrust();
-  //   UI.updateMeasurement('thrust');
-  //   setTimeout(Update.thrust, measurementUpdateInterval);
-  // }
-
-  // static rpm() {
-  //   dev ? Dev.getRpm() : WS.getRpm();
-  //   UI.updateMeasurement('rpm');
-  //   setTimeout(Update.rpm, measurementUpdateInterval);
-  // }
-
-  // static volt() {
-  //   dev ? Dev.getVolt() : WS.getVolt();
-  //   UI.updateMeasurement('volt');
-  //   setTimeout(Update.volt, measurementUpdateInterval);
-  // }
-
-  // static amp() {
-  //   dev ? Dev.getAmp() : WS.getAmp();
-  //   UI.updateMeasurement('amp');
-  //   setTimeout(Update.amp, measurementUpdateInterval);
-  // }
 
   static data() {
     dev ? Dev.getData() : WS.getData();
