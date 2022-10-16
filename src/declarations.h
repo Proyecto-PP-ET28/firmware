@@ -22,10 +22,10 @@
 #include "SPI.h"
 
 //* Credenciales WiFi
-// const char *LOCAL_SSID = "Fibertel WiFi617 2.4GHz";
-// const char *LOCAL_PASS = "0041781818";
-const char *LOCAL_SSID = "300 de paleta";
-const char *LOCAL_PASS = "berenjenas";
+const char *LOCAL_SSID = "Fibertel WiFi617 2.4GHz";
+const char *LOCAL_PASS = "0041781818";
+// const char *LOCAL_SSID = "300 de paleta";
+// const char *LOCAL_PASS = "berenjenas";
 
 //* Display (OLED)
 #define OLED_SCL 26
@@ -125,7 +125,6 @@ int motorPWM = 0;
 #define ADC_MAP_OUT_MIN 0.12
 #define ADC_MAP_OUT_MAX 2.75
 #define CURRENT_SENS 25
-#define CURRENT_OFFSET 0.095
 #define CURRENT_QOV 2.5
 unsigned long ADCLastMillis = 0;
 int ADCReadingCount = 0;
@@ -146,9 +145,9 @@ unsigned long debounceMillis = 0;
 bool btnState = true;
 
 //* Menú
-#define MENU_SIZE 10
-String menuItem[MENU_SIZE] = {"< Volver", "Capturar", "Tare", "Reiniciar max", "Mostrar IP / Codigo QR", "Cantidad de palas", "PWM min", "PWM max", "Mostrar maximos", "Mostrar tiempo real"};
-String menuItemValue[MENU_SIZE] = {"", "", "", "", "", "2", "1.00", "2.00", "ON", "ON"};
+#define MENU_SIZE 11
+String menuItem[MENU_SIZE] = {"< Volver", "Capturar", "Tare", "Reiniciar max", "Mostrar IP / Codigo QR", "Cantidad de palas", "PWM min", "PWM max", "Factor de desfase", "Mostrar maximos", "Mostrar tiempo real"};
+String menuItemValue[MENU_SIZE] = {"", "", "", "", "", "2", "1.00", "2.00", "0.100", "ON", "ON"};
 int currentMenuIndex = 0;
 int displayMenuIndex = 0;
 int displayMenuSelected = 0;
@@ -170,14 +169,18 @@ bool displayRealTime = true;
 
 float minPwmMs = 1.00;
 float maxPwmMs = 2.00;
+float currentOffset = 0.095;
 
 int minPwmIndex = 10;
 int lastMinPwmIndex = 10;
 int maxPwmIndex = 10;
 int lastMaxPwmIndex = 10;
+int currentOffsetIndex = 10;
+int lastCurrentOffsetIndex = 10;
 
 const float minPwmVals[21] = {0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15, 1.20, 1.25, 1.30, 1.35, 1.40, 1.45, 1.50};
 const float maxPwmVals[21] = {1.50, 1.55, 1.60, 1.65, 1.70, 1.75, 1.80, 1.85, 1.90, 1.95, 2.00, 2.05, 2.10, 2.15, 2.20, 2.25, 2.30, 2.35, 2.40, 2.45, 2.50};
+const float currentOffsetVals[21] = {0.050, 0.055, 0.060, 0.065, 0.070, 0.075, 0.080, 0.085, 0.090, 0.095, 0.100, 0.105, 0.110, 0.115, 0.120, 0.125, 0.130, 0.135, 0.140, 0.145, 0.150};
 
 //* Variables globales
 bool qrIsVisible = true;

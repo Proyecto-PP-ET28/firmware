@@ -48,6 +48,13 @@ void IRAM_ATTR Ext_INT1_ISR() {  // Rotación del encoder
               maxPwmIndex--;
             }
             break;
+
+            //* Factor de desfase
+          case 8:
+            if (currentOffsetIndex > 0) {
+              currentOffsetIndex--;
+            }
+            break;
         }
       } else {
         if (currentMenuIndex > 0) {
@@ -86,6 +93,13 @@ void IRAM_ATTR Ext_INT1_ISR() {  // Rotación del encoder
           case 7:
             if (maxPwmIndex < 20) {
               maxPwmIndex++;
+            }
+            break;
+
+            //* Factor de desfase
+          case 8:
+            if (currentOffsetIndex < 20) {
+              currentOffsetIndex++;
             }
             break;
         }
@@ -171,8 +185,16 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Botón del encoder
         }
         break;
 
-        //* Mostrar maximos
+        //* Factor de desfase
       case 8:
+        isEditingValue = !isEditingValue;
+        if (!isEditingValue) {
+          config.putInt("currentIndex", currentOffsetIndex);
+        }
+        break;
+
+        //* Mostrar maximos
+      case 9:
         if (displayPeek) {
           displayPeek = false;
           menuItemValue[currentMenuIndex] = "OFF";
@@ -184,7 +206,7 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Botón del encoder
         break;
 
         //* Mostrar tiempo real
-      case 9:
+      case 10:
         if (displayRealTime) {
           displayRealTime = false;
           menuItemValue[currentMenuIndex] = "OFF";
@@ -296,11 +318,16 @@ void loop() {
     menuItemValue[7] = String(maxPwmMs);
   }
 
+  if (currentOffsetIndex != lastCurrentOffsetIndex) {
+    lastCurrentOffsetIndex = currentOffsetIndex;
+    currentOffset = currentOffsetVals[currentOffsetIndex];
+    menuItemValue[8] = String(currentOffset, 3);
+  }
+
   if (thrust > thrustMax) thrustMax = thrust;
   if (RPM > RPMMax) RPMMax = RPM;
   if (extBatVolt > extBatVoltMax) extBatVoltMax = extBatVolt;
   if (extBatAmp > extBatAmpMax) extBatAmpMax = extBatAmp;
-
 
   batteryLevel = intBatVolt;
   if (!qrIsVisible) {
@@ -391,6 +418,12 @@ void initServer() {
   server.on("/bat", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/plain", String(batteryLevel).c_str());
   });
+  server.on("/data", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", String(String(thrust) + "," + String(RPM) + "," + String(extBatVolt) + "," + String(extBatAmp)).c_str());
+  });
+  server.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", String(String(bladesNum) + "," + String(displayRealTime) + "," + String(displayPeek) + "," + String(minPwmMs) + "," + String(maxPwmMs) + "," + String(currentOffset, 3)).c_str());
+  });
   server.serveStatic("/", SPIFFS, "/");
   server.begin();
 }
@@ -445,17 +478,24 @@ void initConfig() {
   maxPwmMs = maxPwmVals[maxIndex];
   menuItemValue[7] = String(maxPwmMs);
 
+  const int offsetIndex = config.getInt("currentIndex", currentOffsetIndex);
+  currentOffsetIndex = offsetIndex;
+  lastCurrentOffsetIndex = offsetIndex;
+  currentOffset = currentOffsetVals[offsetIndex];
+  menuItemValue[8] = String(currentOffset, 3);
+
   displayPeek = config.getBool("displayPeek", displayPeek);
-  if (displayPeek) menuItemValue[8] = "ON";
-  if (!displayPeek) menuItemValue[8] = "OFF";
+  if (displayPeek) menuItemValue[9] = "ON";
+  if (!displayPeek) menuItemValue[9] = "OFF";
 
   displayRealTime = config.getBool("displayRealTime", displayRealTime);
-  if (displayRealTime) menuItemValue[9] = "ON";
-  if (!displayRealTime) menuItemValue[9] = "OFF";
+  if (displayRealTime) menuItemValue[10] = "ON";
+  if (!displayRealTime) menuItemValue[10] = "OFF";
 
   Serial.println(bladesNum);
   Serial.println(minPwmMs);
   Serial.println(maxPwmMs);
+  Serial.println(currentOffset);
   Serial.println(displayPeek);
   Serial.println(displayRealTime);
 }
@@ -507,12 +547,11 @@ void initSD() {
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
   switch (type) {
     case WS_EVT_CONNECT:
-      qrIsVisible = true;
+      qrIsVisible = false;
       if (debug) Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
       break;
     case WS_EVT_DISCONNECT:
       if (debug) Serial.printf("WebSocket client #%u disconnected\n", client->id());
-      qrIsVisible = false;
       break;
     case WS_EVT_DATA:
       handleWebSocketMessage(arg, data, len);
@@ -534,17 +573,65 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     if (message.indexOf("SNAP") >= 0) {
       Serial.println("Captura");
     }
-    if (message.indexOf("REC") >= 0) {
-      Serial.println("Grabación");
+    if (message.indexOf("TARE") >= 0) {
+      triggerTare = true;
     }
     if (message.indexOf("RST") >= 0) {
-      Serial.println("Reiniciar máximos");
+        RPMMax = 0;
+        thrustMax = 0;
+        extBatVoltMax = 0;
+        extBatAmpMax = 0;
     }
     if (message.indexOf("S_DOWN") >= 0) {
       isSliderDown = true;
     }
     if (message.indexOf("S_UP") >= 0) {
       isSliderDown = false;
+    }
+    if (message.indexOf("SAVE_BLADES_NUM") >= 0) {
+      message.remove(0, String("SAVE_BLADES_NUM").length() + 1);
+      bladesNum = message.toInt();
+      menuItemValue[5] = message;
+      config.putInt("bladesNum", bladesNum);
+    }
+    if (message.indexOf("SAVE_DISPLAY_REAL_TIME") >= 0) {
+      message.remove(0, String("SAVE_DISPLAY_REAL_TIME").length() + 1);
+      displayRealTime = message == "1";
+      if (displayRealTime)
+        menuItemValue[10] = "ON";
+      else
+        menuItemValue[10] = "OFF";
+      config.putBool("displayRealTime", displayRealTime);
+    }
+    if (message.indexOf("SAVE_DISPLAY_PEAK") >= 0) {
+      message.remove(0, String("SAVE_DISPLAY_PEAK").length() + 1);
+      displayPeek = message == "1";
+      if (displayPeek)
+        menuItemValue[9] = "ON";
+      else
+        menuItemValue[9] = "OFF";
+      config.putBool("displayPeek", displayPeek);
+    }
+    if (message.indexOf("SAVE_PWM_MIN") >= 0) {
+      message.remove(0, String("SAVE_PWM_MIN").length() + 1);
+      minPwmIndex = round((message.toFloat() - 0.5) / 0.05);
+      minPwmMs = minPwmVals[minPwmIndex];
+      menuItemValue[6] = String(minPwmMs);
+      config.putInt("pwmMinIndex", minPwmIndex);
+    }
+    if (message.indexOf("SAVE_PWM_MAX") >= 0) {
+      message.remove(0, String("SAVE_PWM_MAX").length() + 1);
+      maxPwmIndex = round((message.toFloat() - 1.5) / 0.05);
+      maxPwmMs = maxPwmVals[maxPwmIndex];
+      menuItemValue[7] = String(maxPwmMs);
+      config.putInt("pwmMinIndex", maxPwmIndex);
+    }
+    if (message.indexOf("SAVE_CURRENT_OFFSET") >= 0) {
+      message.remove(0, String("SAVE_CURRENT_OFFSET").length() + 1);
+      currentOffsetIndex = round((message.toFloat() - 0.05) / 0.005);
+      currentOffset = currentOffsetVals[currentOffsetIndex];
+      menuItemValue[8] = String(currentOffset, 3);
+      config.putInt("currentIndex", currentOffsetIndex);
     }
     if (strcmp((char *)data, "getValues") == 0) {
       notifyClients(getCurrentValues());
@@ -831,7 +918,7 @@ void readADCs() {
       // intBatVolt = mapFloat(rawIntBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * INT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
       intBatVolt = map(rawIntBatVolt / ADC_N_READINGS, 0, 4095, 0, 100);
       extBatVolt = mapFloat(rawExtBatVolt / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * EXT_BAT_VOLT_DIV_FACTOR * ADCVoltFactor;
-      extBatAmp = (mapFloat(rawExtBatAmp / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * ADCVoltFactor - CURRENT_QOV + CURRENT_OFFSET) * CURRENT_SENS;
+      extBatAmp = (mapFloat(rawExtBatAmp / ADC_N_READINGS, ADC_MAP_IN_MIN, ADC_MAP_IN_MAX, ADC_MAP_OUT_MIN, ADC_MAP_OUT_MAX) * ADCVoltFactor - CURRENT_QOV + currentOffset) * CURRENT_SENS;
       rawIntBatVolt = 0;
       rawExtBatVolt = 0;
       rawExtBatAmp = 0;
@@ -897,10 +984,10 @@ void tachometer() {
   // Serial.print(AmountOfReadings);
   // Serial.print("\tFrequency: ");
   // Serial.print(FrequencyReal);
-  Serial.print("RPM: ");
-  Serial.println(RPM / 2);
-  Serial.print("  Tachometer: ");
-  Serial.println(average);
+  // Serial.print("RPM: ");
+  // Serial.println(RPM / 2);
+  // Serial.print("  Tachometer: ");
+  // Serial.println(average);
   // End of tachometre
 }
 
