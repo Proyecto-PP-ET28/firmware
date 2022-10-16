@@ -32,7 +32,7 @@ const char *LOCAL_PASS = "0041781818";
 #define OLED_SDA 25
 #define OLED_RES 33
 #define OLED_DC 32
-#define OLED_CS 80  // No conectado
+#define OLED_CS 17  // No conectado
 
 #define primaryFont u8g2_font_NokiaSmallBold_tr
 #define secondaryFont u8g2_font_smallsimple_tr
