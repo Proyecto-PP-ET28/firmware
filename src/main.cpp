@@ -367,28 +367,39 @@ void initFS() {
 
 void initWiFi() {
   WiFi.mode(WIFI_STA);
-  WiFi.begin(LOCAL_SSID, LOCAL_PASS);
   // wifiManager.resetSettings();
-  // wifiManager.setClass("invert");
-  // bool res = wifiManager.autoConnect("ESIMA AP");
-  // if (debug) {
-  //   if (!res) {
-  //     Serial.println("Failed to connect");
-  //   } else {
-  //     Serial.println("Connection successful");
-  //   }
-  // }
-  if (debug) Serial.printf("Conectando a %s\n", LOCAL_SSID);
-  while (WiFi.status() != WL_CONNECTED) {
-    if (debug) Serial.print('.');
-    delay(500);
+  wifiManager.setClass("invert");
+  wifiManager.setConfigPortalBlocking(false);
+  wifiManager.setConnectTimeout(6);
+
+  String savedSsid = wifiManager.getWiFiSSID();
+  String savedPass = wifiManager.getWiFiPass();
+
+  bool ssidIsSaved = wifiManager.getWiFiIsSaved();
+  if (ssidIsSaved) {
+    oledPrintWifi("connecting", wifiManager.getWiFiSSID());
+  } else {
+    oledPrintWifi("creating_ap", "");
   }
-  // if (!MDNS.begin("esima")) {
-  //   if (debug) Serial.println("Error starting mDNS");
-  //   return;
-  // }
+
+  bool res = wifiManager.autoConnect("ESIMA AP");
+
+  if (!res) {
+    oledPrintWifi("fail", wifiManager.getWiFiSSID());
+    oledPrintWifi("creating_ap", "");
+  }
+
+  while (WiFi.status() != WL_CONNECTED) {
+    wifiManager.process();
+
+    if (wifiManager.getWiFiSSID() != savedSsid || wifiManager.getWiFiPass() != savedPass) {
+      oledPrintWifi("connecting", wifiManager.getWiFiSSID());
+    }
+  }
+  oledPrintWifi("success", wifiManager.getWiFiSSID());
   digitalWrite(WIFI_STATUS, HIGH);
   if (debug) Serial.println(WiFi.localIP());
+  delay(1000);
 }
 
 void initWebSocket() {
@@ -577,10 +588,10 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       triggerTare = true;
     }
     if (message.indexOf("RST") >= 0) {
-        RPMMax = 0;
-        thrustMax = 0;
-        extBatVoltMax = 0;
-        extBatAmpMax = 0;
+      RPMMax = 0;
+      thrustMax = 0;
+      extBatVoltMax = 0;
+      extBatAmpMax = 0;
     }
     if (message.indexOf("S_DOWN") >= 0) {
       isSliderDown = true;
@@ -672,11 +683,83 @@ void oledPrintFPS() {
 }
 
 void oledPrintInitScreen() {
+  // u8g2.setFont(u8g2_font_pixzillav1_te);
+  // const int textOffset = (128 - u8g2.getStrWidth(String("Conectando...").c_str())) / 2;
+  // u8g2.setCursor(textOffset, 28);
+  // u8g2.print("Conectando...");
+
+  // u8g2.clearBuffer();
+  // u8g2.drawXBMP(48, 18, esima_logo_width, esima_logo_height, esima_logo_bits);  //-14 -> 34
+  // u8g2.sendBuffer();
+  // delay(1000);
+  // for (int i = 0; i <= 48; i += 4) {
+  //   u8g2.clearBuffer();
+  //   u8g2.drawXBMP(-14 + i, 24, esima_text_width, esima_text_height, esima_text_bits);  // 48 -> 0
+  //   u8g2.drawXBMP(48 - i, 18, esima_logo_width, esima_logo_height, esima_logo_bits);   //-14 -> 34
+  //   u8g2.setDrawColor(0);
+  //   u8g2.drawBox(0, 0, 48 - i, 64);
+  //   u8g2.setDrawColor(1);
+  //   u8g2.sendBuffer();
+  // }
+  // delay(1000);
+
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_pixzillav1_te);
-  const int textOffset = (128 - u8g2.getStrWidth(String("Conectando...").c_str())) / 2;
-  u8g2.setCursor(textOffset, 28);
-  u8g2.print("Conectando...");
+  u8g2.drawXBMP(34, 24, esima_text_width, esima_text_height, esima_text_bits);
+  u8g2.drawXBMP(0, 18, esima_logo_width, esima_logo_height, esima_logo_bits);
+  u8g2.sendBuffer();
+  delay(2000);
+}
+
+void oledPrintWifi(String type, String ssid) {
+  u8g2.clearBuffer();
+  if (type == "connecting") {
+    u8g2.setFont(u8g2_font_helvB08_te);
+    const int textOffset1 = (128 - u8g2.getStrWidth(String("Intentando conexion a...").c_str())) / 2;
+    u8g2.setCursor(textOffset1, 24);
+    u8g2.print("Intentando conexion a...");
+
+    u8g2.setFont(u8g2_font_helvR08_tf);
+    const int textOffset2 = (128 - u8g2.getStrWidth(String(ssid).c_str())) / 2;
+    u8g2.setCursor(textOffset2, 42);
+    u8g2.print(ssid);
+  }
+
+  if (type == "success") {
+    u8g2.setFont(u8g2_font_helvB08_te);
+    const int textOffset1 = (128 - u8g2.getStrWidth(String("Conectado a").c_str())) / 2;
+    u8g2.setCursor(textOffset1, 24);
+    u8g2.print("Conectado a");
+
+    u8g2.setFont(u8g2_font_helvR08_tf);
+    const int textOffset2 = (128 - u8g2.getStrWidth(String(ssid).c_str())) / 2;
+    u8g2.setCursor(textOffset2, 42);
+    u8g2.print(ssid);
+  }
+
+  if (type == "fail") {
+    u8g2.setFont(u8g2_font_helvB08_te);
+    const int textOffset1 = (128 - u8g2.getStrWidth(String("Error conectando a").c_str())) / 2;
+    u8g2.setCursor(textOffset1, 24);
+    u8g2.print("Error conectando a");
+
+    u8g2.setFont(u8g2_font_helvR08_tf);
+    const int textOffset2 = (128 - u8g2.getStrWidth(String(ssid).c_str())) / 2;
+    u8g2.setCursor(textOffset2, 42);
+    u8g2.print(ssid);
+  }
+
+  if (type == "creating_ap") {
+    u8g2.setFont(u8g2_font_helvB08_te);
+    const int textOffset1 = (128 - u8g2.getStrWidth(String("Creando access point").c_str())) / 2;
+    u8g2.setCursor(textOffset1, 24);
+    u8g2.print("Creando access point");
+
+    u8g2.setFont(u8g2_font_helvR08_tf);
+    const int textOffset2 = (128 - u8g2.getStrWidth(String("\"ESIMA AP\"").c_str())) / 2;
+    u8g2.setCursor(textOffset2, 42);
+    u8g2.print("\"ESIMA AP\"");
+  }
+
   u8g2.sendBuffer();
 }
 
