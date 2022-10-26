@@ -277,6 +277,7 @@ void setup() {
   initServer();    // Server: Requests al Server
   initOTA();       // Actualizaciones OTA
   initLoadCell();  // Celda de carga
+  // initLoadCellCalibration();  // Calibración de la celda de carga
   initSD();
   pinMode(WIFI_STATUS, OUTPUT);
 
@@ -355,6 +356,58 @@ void initLoadCell() {
   Load.begin(LOAD_DT, LOAD_SCK);
   Load.set_scale(LOAD_CAL_VALUE);
   Load.tare();
+}
+
+
+void initLoadCellCalibration() {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_helvB08_te);
+    u8g2.setCursor(0, 8);
+    u8g2.print("Secuencia de calibración");
+    u8g2.setCursor(0, 19);
+    u8g2.print("para la celda de carga");
+    u8g2.sendBuffer();
+
+    delay(2000);
+    Load.begin(LOAD_DT, LOAD_SCK);
+    Load.set_scale();
+
+    u8g2.clearBuffer();
+    u8g2.setCursor(0, 8);
+    u8g2.print("Tare...");
+    u8g2.setCursor(0, 22);
+    u8g2.print("Quitar cualquier peso");
+    u8g2.setCursor(0, 33);
+    u8g2.print("que tenga la celda.");
+    u8g2.sendBuffer();
+
+    delay(5000);
+    Load.tare();
+
+    u8g2.clearBuffer();
+    u8g2.setCursor(0, 8);
+    u8g2.print("Tare completado!");
+    u8g2.setCursor(0, 22);
+    u8g2.print("Colocar un peso conocido");
+    u8g2.setCursor(0, 33);
+    u8g2.print("sobre la celda.");
+    u8g2.sendBuffer();
+    
+    delay(5000);
+    long reading = Load.get_units(10);
+
+    u8g2.clearBuffer();
+    u8g2.setCursor(0, 8);
+    u8g2.print("Resultado:");
+    u8g2.setCursor(0, 19);
+    u8g2.print(reading);
+    u8g2.setCursor(0, 33);
+    u8g2.println("Factor de calibracion =");
+    u8g2.setCursor(0, 44);
+    u8g2.println("resultado / p. conocido");
+    u8g2.sendBuffer();
+
+    while (true);
 }
 
 void initFS() {

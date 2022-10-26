@@ -56,7 +56,7 @@ String checkGlyph = "#";
 //* Celda de carga (LOAD)
 #define LOAD_SCK 0
 #define LOAD_DT 4
-#define LOAD_CAL_VALUE -435
+#define LOAD_CAL_VALUE -193
 #define THRUST_READING_DELAY 200
 unsigned long trustLastMillis = 0;
 int thrust = 0;
@@ -215,6 +215,7 @@ void oledPrintInitScreen();
 void oledPrintWifi(String type, String ssid);
 void initOTA();
 void initLoadCell();
+void initLoadCellCalibration();
 void oledPrintMainScreen();
 void readThrust();
 void oledPrintMenu();
