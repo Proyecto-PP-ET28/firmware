@@ -3,7 +3,7 @@
 bool debug = true;  // TODO: Habilitar/Deshabilitar debugging
 
 Preferences config;
-U8G2_SH1106_128X64_NONAME_F_4W_SW_SPI u8g2(U8G2_R0, OLED_SCL, OLED_SDA, OLED_CS, OLED_DC, OLED_RES);
+U8G2_SH1106_128X64_NONAME_F_4W_SW_SPI u8g2(U8G2_R2, OLED_SCL, OLED_SDA, OLED_CS, OLED_DC, OLED_RES);
 MD_REncoder Encoder = MD_REncoder(EN_CLK, EN_DT);
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
