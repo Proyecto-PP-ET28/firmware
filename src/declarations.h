@@ -138,6 +138,9 @@ float extBatAmpMax = 0;
 unsigned long debounceMillis = 0;
 bool btnState = true;
 
+//* Botón Stop
+#define STOP_BTN 35
+
 //* Menú
 #define MENU_SIZE 11
 String menuItem[MENU_SIZE] = {"< Volver", "Capturar", "Tare", "Reiniciar max", "Mostrar IP / Codigo QR", "Cantidad de palas", "PWM min", "PWM max", "Factor de desfase", "Mostrar maximos", "Mostrar tiempo real"};

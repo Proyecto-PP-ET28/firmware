@@ -223,7 +223,12 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Botón del encoder
     btnState = true;
   }
 }
-void IRAM_ATTR Ext_INT3_ISR()  // The interrupt runs this to calculate the period between pulses:
+
+void IRAM_ATTR Ext_INT3_ISR() {
+  motorPWM = 0;
+}
+
+void IRAM_ATTR Ext_INT4_ISR()  // The interrupt runs this to calculate the period between pulses:
 {
   PeriodBetweenPulses = micros() - LastTimeWeMeasured;  // Current "micros" minus the old "micros" when the last pulse happens.
                                                         // This will result with the period (microseconds) between both pulses.
@@ -269,6 +274,7 @@ void setup() {
   ESC.attach(ESC_PWM);
   Encoder.begin();
   oledPrintInitScreen();
+  // initLoadCellCalibration();  // Calibración de la celda de carga
   initConfig();
   initADC();
   initFS();
@@ -277,19 +283,20 @@ void setup() {
   initServer();    // Server: Requests al Server
   initOTA();       // Actualizaciones OTA
   initLoadCell();  // Celda de carga
-  // initLoadCellCalibration();  // Calibración de la celda de carga
   initSD();
   pinMode(WIFI_STATUS, OUTPUT);
 
   pinMode(EN_CLK, INPUT);
   pinMode(EN_DT, INPUT);
   pinMode(EN_SW, INPUT);
+  pinMode(STOP_BTN, INPUT_PULLUP);
   pinMode(IR_SENSOR, INPUT_PULLUP);
 
   attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT3_ISR, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
+  attachInterrupt(STOP_BTN, Ext_INT3_ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT4_ISR, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
   delay(1000);                                                              // We sometimes take several readings of the period to average. Since we don't have any readings
                                                                             // stored we need a high enough value in micros() so if divided is not going to give negative values.
                                                                             // The delay allows the micros() to be high enough for the first few cycles.
