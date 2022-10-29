@@ -196,6 +196,8 @@ int ms;
 //* Tarjeta SD
 // TODO: Implementar pointers?
 // unsigned long * average_buffer = &average;       //RPM
+void saveDataToCard();
+bool triggerSnap = false;
 
 //! -------------------------------------------------------------------------- !//
 //!                                  FUNCIONES                                 !//

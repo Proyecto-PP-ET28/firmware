@@ -138,6 +138,7 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Botón del encoder
 
         //* Capturar
       case 1:
+        triggerSnap = true;
         menuItemValue[1] = checkGlyph;
         break;
 
@@ -309,6 +310,12 @@ void loop() {
   readThrust();
   readADCs();
   tachometer();
+
+  if(triggerSnap){
+    triggerSnap = false;
+    saveDataToCard();
+  }
+
   if (triggerTare) {
     triggerTare = false;
     Load.tare();
@@ -642,6 +649,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       motorPWM = map(message.substring(3).toInt(), 0, 100, MIN_PWM_VAL, MAX_PWM_VAL);
     }
     if (message.indexOf("SNAP") >= 0) {
+      triggerSnap = true;
       Serial.println("Captura");
     }
     if (message.indexOf("TARE") >= 0) {
@@ -1139,7 +1147,6 @@ void tachometer() {
 //! -------------------------------------------------------------------------- !//
 
 void saveDataToCard() {
-  // TODO: Implementar pointers?
   String data = "{\n\t\"RPM\":\"" + String(average) +
                 "\n\t\"RPM MAX\":\"" + String(RPMMax) +
                 "\n\t\"Empuje\":\"" + String(thrust) +
@@ -1148,9 +1155,11 @@ void saveDataToCard() {
                 "\n\t\"Voltaje MAX\":\"" + String(extBatVoltMax) +
                 "\n\t\"Corriente\":\"" + String(extBatAmp) +
                 "\n\t\"Corriente MAX\":\"" + String(extBatAmpMax) +
-                "\"\n}\n";
+                "\"\n}\n###\n";
 
   appendFile(SD, "/test/data.json", data.c_str());
+
+
 }
 
 void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
