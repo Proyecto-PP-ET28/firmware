@@ -293,14 +293,14 @@ void setup() {
   pinMode(STOP_BTN, INPUT_PULLUP);
   pinMode(IR_SENSOR, INPUT_PULLUP);
 
-  attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
-  attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
-  attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
-  attachInterrupt(STOP_BTN, Ext_INT3_ISR, FALLING);
-  attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT4_ISR, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
-  delay(1000);                                                              // We sometimes take several readings of the period to average. Since we don't have any readings
-                                                                            // stored we need a high enough value in micros() so if divided is not going to give negative values.
-                                                                            // The delay allows the micros() to be high enough for the first few cycles.
+  // attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
+  // attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
+  // attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
+  // attachInterrupt(STOP_BTN, Ext_INT3_ISR, FALLING);
+  // attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT4_ISR, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
+  // delay(1000);                                                              // We sometimes take several readings of the period to average. Since we don't have any readings
+  //                                                                           // stored we need a high enough value in micros() so if divided is not going to give negative values.
+  //                                                                           // The delay allows the micros() to be high enough for the first few cycles.
 }
 
 void loop() {
@@ -439,7 +439,7 @@ void initWiFi() {
   wifiManager.setConfigPortalBlocking(false);
   wifiManager.setConnectTimeout(6);
 
-  String savedSsid = wifiManager.getWiFiSSID();
+  String savedSsid = wifiManager.getWiFiSSID(); 
   String savedPass = wifiManager.getWiFiPass();
 
   bool ssidIsSaved = wifiManager.getWiFiIsSaved();
@@ -1157,7 +1157,7 @@ void saveDataToCard() {
                 "\n\t\"Corriente MAX\":\"" + String(extBatAmpMax) +
                 "\"\n}\n###\n";
 
-  appendFile(SD, "/test/data.json", data.c_str());
+  appendFile(SD, "/data.txt", data.c_str());
 
 
 }
