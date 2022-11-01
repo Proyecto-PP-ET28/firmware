@@ -64,37 +64,8 @@ int thrustMax = 0;
 
 //* Sensor IR
 #define IR_SENSOR 16
-const byte PulsesPerRevolution = 2;                               // Establece cuántos pulsos hay en cada revolución. Default: 2.
-const unsigned long ZeroTimeout = 100000;                         // Para un mayor tiempo de respuesta, un buen valor sería 100000.
-const byte numReadings = 2;                                       // Number of samples for smoothing. The higher, the more smoothing, but it's going to
-volatile unsigned long LastTimeWeMeasured;                        // Stores the last time we measured a pulse so we can calculate the period.
-volatile unsigned long PeriodBetweenPulses = ZeroTimeout + 1000;  // Stores the period between pulses in microseconds.
-                                                                  // It has a big number so it doesn't start with 0 which would be interpreted as a high frequency.
-volatile unsigned long PeriodAverage = ZeroTimeout + 1000;        // Stores the period between pulses in microseconds in total, if we are taking multiple pulses.
-                                                                  // It has a big number so it doesn't start with 0 which would be interpreted as a high frequency.
-unsigned long FrequencyRaw;                                       // Calculated frequency, based on the period. This has a lot of extra decimals without the decimal point.
-unsigned long FrequencyReal;                                      // frecuencia sin decimales.
 unsigned long RPM;
 int RPMMax = 0;                                                   // RPM en crudo, sin ningún procesamiento.
-unsigned int PulseCounter = 1;                                    // Counts the amount of pulse readings we took so we can average multiple pulses before calculating the period.
-
-unsigned long PeriodSum;  // Stores the summation of all the periods to do the average.
-
-unsigned long LastTimeCycleMeasure = LastTimeWeMeasured;  // Stores the last time we measure a pulse in that cycle.
-unsigned long CurrentMicros = micros();                   // Stores the micros in that cycle.
-unsigned int AmountOfReadings = 1;
-
-unsigned int ZeroDebouncingExtra;  // Stores the extra value added to the ZeroTimeout to debounce it.
-                                   // The ZeroTimeout needs debouncing so when the value is close to the threshold it
-                                   // doesn't jump from 0 to the value. This extra value changes the threshold a little
-                                   // when we show a 0.
-
-// Variables for smoothing tachometer:
-unsigned long readings[numReadings];  // The input.
-unsigned long readIndex;              // The index of the current reading.
-unsigned long total;                  // The running total.
-unsigned long average;                // The RPM value after applying the smoothing.
-
 
 //* LED
 #define WIFI_STATUS 2

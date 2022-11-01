@@ -229,46 +229,22 @@ void IRAM_ATTR Ext_INT3_ISR() {
   motorPWM = 0;
 }
 
-void IRAM_ATTR Ext_INT4_ISR()  // The interrupt runs this to calculate the period between pulses:
-{
-  PeriodBetweenPulses = micros() - LastTimeWeMeasured;  // Current "micros" minus the old "micros" when the last pulse happens.
-                                                        // This will result with the period (microseconds) between both pulses.
-                                                        // The way is made, the overflow of the "micros" is not going to cause any issue.
-
-  LastTimeWeMeasured = micros();  // Stores the current micros so the next time we have a pulse we would have something to compare with.
-
-  if (PulseCounter >= AmountOfReadings)  // If counter for amount of readings reach the set limit:
-  {
-    PeriodAverage = PeriodSum / AmountOfReadings;  // Calculate the final period dividing the sum of all readings by the
-                                                   // amount of readings to get the average.
-    PulseCounter = 1;                              // Reset the counter to start over. The reset value is 1 because its the minimum setting allowed (1 reading).
-    PeriodSum = PeriodBetweenPulses;               // Reset PeriodSum to start a new averaging operation.
-
-    // Change the amount of readings depending on the period between pulses.
-    // To be very responsive, ideally we should read every pulse. The problem is that at higher speeds the period gets
-    // too low decreasing the accuracy. To get more accurate readings at higher speeds we should get multiple pulses and
-    // average the period, but if we do that at lower speeds then we would have readings too far apart (laggy or sluggish).
-    // To have both advantages at different speeds, we will change the amount of readings depending on the period between pulses.
-    // Remap period to the amount of readings:
-    int RemapedAmountOfReadings = map(PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
-    // 1st value is what are we going to remap. In this case is the PeriodBetweenPulses.
-    // 2nd value is the period value when we are going to have only 1 reading. The higher it is, the lower RPM has to be to reach 1 reading.
-    // 3rd value is the period value when we are going to have 10 readings. The higher it is, the lower RPM has to be to reach 10 readings.
-    // 4th and 5th values are the amount of readings range.
-    RemapedAmountOfReadings = constrain(RemapedAmountOfReadings, 1, 10);  // Constrain the value so it doesn't go below or above the limits.
-    AmountOfReadings = RemapedAmountOfReadings;                           // Set amount of readings as the remaped value.
-  } else {
-    PulseCounter++;                               // Increase the counter for amount of readings by 1.
-    PeriodSum = PeriodSum + PeriodBetweenPulses;  // Add the periods so later we can average.
-  }
-
-}  // End of Pulse_Even
-
 //! -------------------------------------------------------------------------- !//
 //!                                    MAIN                                    !//
 //! -------------------------------------------------------------------------- !//
 
+const int dataIN = IR_SENSOR;
+
+unsigned long prevMillis = 0;
+unsigned long duration;
+unsigned long refresh;
+
+bool currentState;
+bool prevState = LOW;
+
 void setup() {
+  pinMode(dataIN, INPUT);
+  
   Serial.begin(115200);
   config.begin("config", false);
   u8g2.begin();
@@ -293,14 +269,14 @@ void setup() {
   pinMode(STOP_BTN, INPUT_PULLUP);
   pinMode(IR_SENSOR, INPUT_PULLUP);
 
-  // attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
-  // attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
-  // attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
-  // attachInterrupt(STOP_BTN, Ext_INT3_ISR, FALLING);
+  attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
+  attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
+  attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
+  attachInterrupt(STOP_BTN, Ext_INT3_ISR, FALLING);
   // attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT4_ISR, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
-  // delay(1000);                                                              // We sometimes take several readings of the period to average. Since we don't have any readings
-  //                                                                           // stored we need a high enough value in micros() so if divided is not going to give negative values.
-  //                                                                           // The delay allows the micros() to be high enough for the first few cycles.
+  delay(1000);                                                              // We sometimes take several readings of the period to average. Since we don't have any readings
+                                                                            // stored we need a high enough value in micros() so if divided is not going to give negative values.
+                                                                            // The delay allows the micros() to be high enough for the first few cycles.
 }
 
 void loop() {
@@ -309,7 +285,6 @@ void loop() {
   ESC.write(motorPWM);
   readThrust();
   readADCs();
-  tachometer();
 
   if(triggerSnap){
     triggerSnap = false;
@@ -344,6 +319,20 @@ void loop() {
   if (extBatVolt > extBatVoltMax) extBatVoltMax = extBatVolt;
   if (extBatAmp > extBatAmpMax) extBatAmpMax = extBatAmp;
 
+  currentState = digitalRead(dataIN);
+  if (prevState != currentState) {
+    if (currentState == HIGH) {
+      duration = (micros() - prevMillis);
+      RPM = (60000000 / duration);
+      prevMillis = micros();
+    }
+  }
+  prevState = currentState;
+
+  if ((millis() - refresh) >= 100) {
+    Serial.println(RPM);
+  }
+
   batteryLevel = intBatVolt;
   if (!qrIsVisible) {
     if (isMenuOpen) {
@@ -372,56 +361,56 @@ void initLoadCell() {
   Load.tare();
 }
 
-
 void initLoadCellCalibration() {
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_helvB08_te);
-    u8g2.setCursor(0, 8);
-    u8g2.print("Secuencia de calibración");
-    u8g2.setCursor(0, 19);
-    u8g2.print("para la celda de carga");
-    u8g2.sendBuffer();
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_helvB08_te);
+  u8g2.setCursor(0, 8);
+  u8g2.print("Secuencia de calibración");
+  u8g2.setCursor(0, 19);
+  u8g2.print("para la celda de carga");
+  u8g2.sendBuffer();
 
-    delay(2000);
-    Load.begin(LOAD_DT, LOAD_SCK);
-    Load.set_scale();
+  delay(2000);
+  Load.begin(LOAD_DT, LOAD_SCK);
+  Load.set_scale();
 
-    u8g2.clearBuffer();
-    u8g2.setCursor(0, 8);
-    u8g2.print("Tare...");
-    u8g2.setCursor(0, 22);
-    u8g2.print("Quitar cualquier peso");
-    u8g2.setCursor(0, 33);
-    u8g2.print("que tenga la celda.");
-    u8g2.sendBuffer();
+  u8g2.clearBuffer();
+  u8g2.setCursor(0, 8);
+  u8g2.print("Tare...");
+  u8g2.setCursor(0, 22);
+  u8g2.print("Quitar cualquier peso");
+  u8g2.setCursor(0, 33);
+  u8g2.print("que tenga la celda.");
+  u8g2.sendBuffer();
 
-    delay(5000);
-    Load.tare();
+  delay(5000);
+  Load.tare();
 
-    u8g2.clearBuffer();
-    u8g2.setCursor(0, 8);
-    u8g2.print("Tare completado!");
-    u8g2.setCursor(0, 22);
-    u8g2.print("Colocar un peso conocido");
-    u8g2.setCursor(0, 33);
-    u8g2.print("sobre la celda.");
-    u8g2.sendBuffer();
-    
-    delay(5000);
-    long reading = Load.get_units(10);
+  u8g2.clearBuffer();
+  u8g2.setCursor(0, 8);
+  u8g2.print("Tare completado!");
+  u8g2.setCursor(0, 22);
+  u8g2.print("Colocar un peso conocido");
+  u8g2.setCursor(0, 33);
+  u8g2.print("sobre la celda.");
+  u8g2.sendBuffer();
 
-    u8g2.clearBuffer();
-    u8g2.setCursor(0, 8);
-    u8g2.print("Resultado:");
-    u8g2.setCursor(0, 19);
-    u8g2.print(reading);
-    u8g2.setCursor(0, 33);
-    u8g2.println("Factor de calibracion =");
-    u8g2.setCursor(0, 44);
-    u8g2.println("resultado / p. conocido");
-    u8g2.sendBuffer();
+  delay(5000);
+  long reading = Load.get_units(10);
 
-    while (true);
+  u8g2.clearBuffer();
+  u8g2.setCursor(0, 8);
+  u8g2.print("Resultado:");
+  u8g2.setCursor(0, 19);
+  u8g2.print(reading);
+  u8g2.setCursor(0, 33);
+  u8g2.println("Factor de calibracion =");
+  u8g2.setCursor(0, 44);
+  u8g2.println("resultado / p. conocido");
+  u8g2.sendBuffer();
+
+  while (true)
+    ;
 }
 
 void initFS() {
@@ -1077,77 +1066,13 @@ void readADCs() {
   }
 }
 
-void tachometer() {
-  // The following is going to store the two values that might change in the middle of the cycle.
-  // We are going to do math and functions with those values and they can create glitches if they change in the
-  // middle of the cycle.
-  LastTimeCycleMeasure = LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
-  CurrentMicros = micros();                   // Store the micros() in a variable.
-
-  // CurrentMicros should always be higher than LastTimeWeMeasured, but in rare occasions that's not true.
-  // I'm not sure why this happens, but my solution is to compare both and if CurrentMicros is lower than
-  // LastTimeCycleMeasure I set it as the CurrentMicros.
-  // The need of fixing this is that we later use this information to see if pulses stopped.
-  if (CurrentMicros < LastTimeCycleMeasure) {
-    LastTimeCycleMeasure = CurrentMicros;
-  }
-
-  // Calculate the frequency:
-  FrequencyRaw = 10000000000 / PeriodAverage;  // Calculate the frequency using the period between pulses.
-
-  // Detect if pulses stopped or frequency is too low, so we can show 0 Frequency:
-  if (PeriodBetweenPulses > ZeroTimeout - ZeroDebouncingExtra || CurrentMicros - LastTimeCycleMeasure > ZeroTimeout - ZeroDebouncingExtra) {  // If the pulses are too far apart that we reached the timeout for zero:
-    FrequencyRaw = 0;                                                                                                                         // Set frequency as 0.
-    ZeroDebouncingExtra = 2000;                                                                                                               // Change the threshold a little so it doesn't bounce.
-  } else {
-    ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
-  }
-
-  FrequencyReal = FrequencyRaw / 10000;  // Get frequency without decimals.
-                                         // This is not used to calculate RPM but we remove the decimals just in case
-                                         // you want to print it.
-
-  // Calculate the RPM:
-  RPM = FrequencyRaw / PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
-                                                  // 60 seconds to get minutes.
-  RPM = RPM / 10000;                              // Remove the decimals.
-
-  // Smoothing RPM:
-  total = total - readings[readIndex];  // Advance to the next position in the array.
-  readings[readIndex] = RPM;            // Takes the value that we are going to smooth.
-  total = total + readings[readIndex];  // Add the reading to the total.
-  readIndex = readIndex + 1;            // Advance to the next position in the array.
-
-  if (readIndex >= numReadings)  // If we're at the end of the array:
-  {
-    readIndex = 0;  // Reset array index.
-  }
-
-  // Calculate the average:
-  average = total / numReadings;  // The average value it's the smoothed result.
-
-  // Print information on the serial monitor:
-  // Comment this section if you have a display and you don't need to monitor the values on the serial monitor.
-  // This is because disabling this section would make the loop run faster.
-  // Serial.print("Period: ");
-  // Serial.print(PeriodBetweenPulses);
-  // Serial.print("\tReadings: ");
-  // Serial.print(AmountOfReadings);
-  // Serial.print("\tFrequency: ");
-  // Serial.print(FrequencyReal);
-  // Serial.print("RPM: ");
-  // Serial.println(RPM / 2);
-  // Serial.print("  Tachometer: ");
-  // Serial.println(average);
-  // End of tachometre
-}
-
 //! -------------------------------------------------------------------------- !//
 //!                            FUNCIONES DE LA SD                              !//
 //! -------------------------------------------------------------------------- !//
 
 void saveDataToCard() {
-  String data = "{\n\t\"RPM\":\"" + String(average) +
+  // TODO: Implementar pointers?
+  String data = "{\n\t\"RPM\":\"" + String(RPM) +
                 "\n\t\"RPM MAX\":\"" + String(RPMMax) +
                 "\n\t\"Empuje\":\"" + String(thrust) +
                 "\n\t\"Empuje MAX\":\"" + String(thrustMax) +
