@@ -138,6 +138,7 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Botón del encoder
 
         //* Capturar
       case 1:
+        triggerSnap = true;
         menuItemValue[1] = checkGlyph;
         break;
 
@@ -292,14 +293,14 @@ void setup() {
   pinMode(STOP_BTN, INPUT_PULLUP);
   pinMode(IR_SENSOR, INPUT_PULLUP);
 
-  attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
-  attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
-  attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
-  attachInterrupt(STOP_BTN, Ext_INT3_ISR, FALLING);
-  attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT4_ISR, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
-  delay(1000);                                                              // We sometimes take several readings of the period to average. Since we don't have any readings
-                                                                            // stored we need a high enough value in micros() so if divided is not going to give negative values.
-                                                                            // The delay allows the micros() to be high enough for the first few cycles.
+  // attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
+  // attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
+  // attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
+  // attachInterrupt(STOP_BTN, Ext_INT3_ISR, FALLING);
+  // attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT4_ISR, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
+  // delay(1000);                                                              // We sometimes take several readings of the period to average. Since we don't have any readings
+  //                                                                           // stored we need a high enough value in micros() so if divided is not going to give negative values.
+  //                                                                           // The delay allows the micros() to be high enough for the first few cycles.
 }
 
 void loop() {
@@ -309,6 +310,12 @@ void loop() {
   readThrust();
   readADCs();
   tachometer();
+
+  if(triggerSnap){
+    triggerSnap = false;
+    saveDataToCard();
+  }
+
   if (triggerTare) {
     triggerTare = false;
     Load.tare();
@@ -432,7 +439,7 @@ void initWiFi() {
   wifiManager.setConfigPortalBlocking(false);
   wifiManager.setConnectTimeout(6);
 
-  String savedSsid = wifiManager.getWiFiSSID();
+  String savedSsid = wifiManager.getWiFiSSID(); 
   String savedPass = wifiManager.getWiFiPass();
 
   bool ssidIsSaved = wifiManager.getWiFiIsSaved();
@@ -642,6 +649,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       motorPWM = map(message.substring(3).toInt(), 0, 100, MIN_PWM_VAL, MAX_PWM_VAL);
     }
     if (message.indexOf("SNAP") >= 0) {
+      triggerSnap = true;
       Serial.println("Captura");
     }
     if (message.indexOf("TARE") >= 0) {
@@ -1139,7 +1147,6 @@ void tachometer() {
 //! -------------------------------------------------------------------------- !//
 
 void saveDataToCard() {
-  // TODO: Implementar pointers?
   String data = "{\n\t\"RPM\":\"" + String(average) +
                 "\n\t\"RPM MAX\":\"" + String(RPMMax) +
                 "\n\t\"Empuje\":\"" + String(thrust) +
@@ -1148,9 +1155,11 @@ void saveDataToCard() {
                 "\n\t\"Voltaje MAX\":\"" + String(extBatVoltMax) +
                 "\n\t\"Corriente\":\"" + String(extBatAmp) +
                 "\n\t\"Corriente MAX\":\"" + String(extBatAmpMax) +
-                "\"\n}\n";
+                "\"\n}\n###\n";
 
-  appendFile(SD, "/test/data.json", data.c_str());
+  appendFile(SD, "/data.txt", data.c_str());
+
+
 }
 
 void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
