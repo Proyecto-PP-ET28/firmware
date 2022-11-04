@@ -56,7 +56,7 @@ String checkGlyph = "#";
 //* Celda de carga (LOAD)
 #define LOAD_SCK 0
 #define LOAD_DT 4
-#define LOAD_CAL_VALUE -193
+#define LOAD_CAL_VALUE -228
 #define THRUST_READING_DELAY 200
 unsigned long trustLastMillis = 0;
 int thrust = 0;
@@ -83,7 +83,7 @@ int motorPWM = 0;
 #define CURRENT_SENSOR 34
 #define EXT_BAT_VOLT_DIV_FACTOR 11
 #define INT_BAT_VOLT_DIV_FACTOR 1
-#define ADC_N_READINGS 3
+#define ADC_N_READINGS 10
 #define ADC_READING_DELAY 1
 #define ADC_MAP_IN_MIN 0.02
 #define ADC_MAP_IN_MAX 2.60
@@ -146,9 +146,16 @@ int lastMaxPwmIndex = 10;
 int currentOffsetIndex = 10;
 int lastCurrentOffsetIndex = 10;
 
+/*
+Como los valores se modifican a través de interrupciones, el watchdog salta si las ejecuciones
+son demasiado largas. Las operaciones de coma flotante, lo son. Por lo que en lugar de cambiar
+el dato directamente, se modifica un índice que apunta a una dirección de memoria de un "array"
+en específico. La asignación de la variable real se realiza en el loop principal cunado se
+detectan cambios en el índice.
+*/
 const float minPwmVals[21] = {0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15, 1.20, 1.25, 1.30, 1.35, 1.40, 1.45, 1.50};
 const float maxPwmVals[21] = {1.50, 1.55, 1.60, 1.65, 1.70, 1.75, 1.80, 1.85, 1.90, 1.95, 2.00, 2.05, 2.10, 2.15, 2.20, 2.25, 2.30, 2.35, 2.40, 2.45, 2.50};
-const float currentOffsetVals[21] = {0.050, 0.055, 0.060, 0.065, 0.070, 0.075, 0.080, 0.085, 0.090, 0.095, 0.100, 0.105, 0.110, 0.115, 0.120, 0.125, 0.130, 0.135, 0.140, 0.145, 0.150};
+const float currentOffsetVals[21] = {-0.050, -0.045, -0.040, -0.035, -0.030, -0.025, -0.020, -0.015, -0.010, -0.005, 0.000, 0.005, 0.010, 0.015, 0.020, 0.025, 0.030, 0.035, 0.040, 0.045, 0.050};
 
 //* Variables globales
 bool qrIsVisible = true;
