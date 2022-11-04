@@ -192,7 +192,7 @@ void oledPrintFPS();
 void oledPrintBattery(int level, bool percentage);
 void oledPrintBar(bool showNumber, bool convertToPercentage = false);
 void Task1code(void *pvParameters);
-void oledPrintInitScreen();
+void oledInitScreen();
 void oledPrintWifi(String type, String ssid);
 void initOTA();
 void initLoadCell();

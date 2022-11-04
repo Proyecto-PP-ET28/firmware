@@ -250,7 +250,7 @@ void setup() {
   u8g2.begin();
   ESC.attach(ESC_PWM);
   Encoder.begin();
-  oledPrintInitScreen();
+  oledInitScreen();
   // initLoadCellCalibration();  // Calibración de la celda de carga
   initConfig();
   initADC();
@@ -739,32 +739,27 @@ void oledPrintFPS() {
   u8g2.print((int)ms);
 }
 
-void oledPrintInitScreen() {
-  // u8g2.setFont(u8g2_font_pixzillav1_te);
-  // const int textOffset = (128 - u8g2.getStrWidth(String("Conectando...").c_str())) / 2;
-  // u8g2.setCursor(textOffset, 28);
-  // u8g2.print("Conectando...");
+void oledInitScreen() {
+  u8g2.clearBuffer();
+  u8g2.drawXBMP(48, 18, esima_logo_width, esima_logo_height, esima_logo_bits);  //-14 -> 34
+  u8g2.sendBuffer();
+  delay(1000);
+  for (int i = 0; i <= 48; i += 4) {
+    u8g2.clearBuffer();
+    u8g2.drawXBMP(-14 + i, 24, esima_text_width, esima_text_height, esima_text_bits);  // 48 -> 0
+    u8g2.drawXBMP(48 - i, 18, esima_logo_width, esima_logo_height, esima_logo_bits);   //-14 -> 34
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(0, 0, 48 - i, 64);
+    u8g2.setDrawColor(1);
+    u8g2.sendBuffer();
+  }
+  delay(1000);
 
   // u8g2.clearBuffer();
-  // u8g2.drawXBMP(48, 18, esima_logo_width, esima_logo_height, esima_logo_bits);  //-14 -> 34
+  // u8g2.drawXBMP(34, 24, esima_text_width, esima_text_height, esima_text_bits);
+  // u8g2.drawXBMP(0, 18, esima_logo_width, esima_logo_height, esima_logo_bits);
   // u8g2.sendBuffer();
-  // delay(1000);
-  // for (int i = 0; i <= 48; i += 4) {
-  //   u8g2.clearBuffer();
-  //   u8g2.drawXBMP(-14 + i, 24, esima_text_width, esima_text_height, esima_text_bits);  // 48 -> 0
-  //   u8g2.drawXBMP(48 - i, 18, esima_logo_width, esima_logo_height, esima_logo_bits);   //-14 -> 34
-  //   u8g2.setDrawColor(0);
-  //   u8g2.drawBox(0, 0, 48 - i, 64);
-  //   u8g2.setDrawColor(1);
-  //   u8g2.sendBuffer();
-  // }
-  // delay(1000);
-
-  u8g2.clearBuffer();
-  u8g2.drawXBMP(34, 24, esima_text_width, esima_text_height, esima_text_bits);
-  u8g2.drawXBMP(0, 18, esima_logo_width, esima_logo_height, esima_logo_bits);
-  u8g2.sendBuffer();
-  delay(2000);
+  // delay(2000);
 }
 
 void oledPrintWifi(String type, String ssid) {
