@@ -244,7 +244,7 @@ bool prevState = LOW;
 
 void setup() {
   pinMode(dataIN, INPUT);
-  
+
   Serial.begin(115200);
   config.begin("config", false);
   u8g2.begin();
@@ -272,11 +272,11 @@ void setup() {
   attachInterrupt(EN_CLK, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
-  attachInterrupt(STOP_BTN, Ext_INT3_ISR, FALLING);
+  attachInterrupt(STOP_BTN, Ext_INT3_ISR, RISING);
   // attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT4_ISR, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
-  delay(1000);                                                              // We sometimes take several readings of the period to average. Since we don't have any readings
-                                                                            // stored we need a high enough value in micros() so if divided is not going to give negative values.
-                                                                            // The delay allows the micros() to be high enough for the first few cycles.
+  delay(1000);  // We sometimes take several readings of the period to average. Since we don't have any readings
+                // stored we need a high enough value in micros() so if divided is not going to give negative values.
+                // The delay allows the micros() to be high enough for the first few cycles.
 }
 
 void loop() {
@@ -286,7 +286,7 @@ void loop() {
   readThrust();
   readADCs();
 
-  if(triggerSnap){
+  if (triggerSnap) {
     triggerSnap = false;
     saveDataToCard();
   }
@@ -428,7 +428,7 @@ void initWiFi() {
   wifiManager.setConfigPortalBlocking(false);
   wifiManager.setConnectTimeout(6);
 
-  String savedSsid = wifiManager.getWiFiSSID(); 
+  String savedSsid = wifiManager.getWiFiSSID();
   String savedPass = wifiManager.getWiFiPass();
 
   bool ssidIsSaved = wifiManager.getWiFiIsSaved();
@@ -487,6 +487,9 @@ void initServer() {
   });
   server.on("/data", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/plain", String(String(thrust) + "," + String(RPM) + "," + String(extBatVolt) + "," + String(extBatAmp)).c_str());
+  });
+  server.on("/saved", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", readFile(SD, "/data.txt").c_str());
   });
   server.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/plain", String(String(bladesNum) + "," + String(displayRealTime) + "," + String(displayPeek) + "," + String(minPwmMs) + "," + String(maxPwmMs) + "," + String(currentOffset, 3)).c_str());
@@ -1067,19 +1070,17 @@ void readADCs() {
 
 void saveDataToCard() {
   // TODO: Implementar pointers?
-  String data = "{\n\t\"RPM\":\"" + String(RPM) +
-                "\n\t\"RPM MAX\":\"" + String(RPMMax) +
-                "\n\t\"Empuje\":\"" + String(thrust) +
-                "\n\t\"Empuje MAX\":\"" + String(thrustMax) +
-                "\n\t\"Voltaje\":\"" + String(extBatVolt) +
-                "\n\t\"Voltaje MAX\":\"" + String(extBatVoltMax) +
-                "\n\t\"Corriente\":\"" + String(extBatAmp) +
+  String data = "{\n\t\"RPM\":\"" + String(RPM) + "\"," +
+                "\n\t\"RPM MAX\":\"" + String(RPMMax) + "\"," +
+                "\n\t\"Empuje\":\"" + String(thrust) + "\"," +
+                "\n\t\"Empuje MAX\":\"" + String(thrustMax) + "\"," +
+                "\n\t\"Voltaje\":\"" + String(extBatVolt) + "\"," +
+                "\n\t\"Voltaje MAX\":\"" + String(extBatVoltMax) + "\"," +
+                "\n\t\"Corriente\":\"" + String(extBatAmp) + "\"," +
                 "\n\t\"Corriente MAX\":\"" + String(extBatAmpMax) +
                 "\"\n}\n###\n";
 
   appendFile(SD, "/data.txt", data.c_str());
-
-
 }
 
 void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
@@ -1137,20 +1138,24 @@ void removeDir(fs::FS &fs, const char *path) {
   }
 }
 
-void readFile(fs::FS &fs, const char *path) {
+String readFile(fs::FS &fs, const char *path) {
   Serial.printf("Reading file: %s\n", path);
 
   File file = fs.open(path);
   if (!file) {
     Serial.println("Failed to open file for reading");
-    return;
+    return String("Error: failed to open file");
   }
-
+  String content = "";
   Serial.print("Read from file: \n");
   while (file.available()) {
-    Serial.write(file.read());
+    char c = file.read();
+    if (isPrintable(c)) {  //
+      content.concat(c);
+    }
   }
   file.close();
+  return content;
 }
 
 void writeFile(fs::FS &fs, const char *path, const char *message) {
