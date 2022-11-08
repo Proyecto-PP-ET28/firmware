@@ -56,7 +56,7 @@ String checkGlyph = "#";
 //* Celda de carga (LOAD)
 #define LOAD_SCK 0
 #define LOAD_DT 4
-#define LOAD_CAL_VALUE -228
+#define LOAD_CAL_VALUE 240
 #define THRUST_READING_DELAY 200
 unsigned long trustLastMillis = 0;
 int thrust = 0;
@@ -81,7 +81,7 @@ int motorPWM = 0;
 #define INT_BAT 36
 #define EXT_BAT 39
 #define CURRENT_SENSOR 34
-#define EXT_BAT_VOLT_DIV_FACTOR 11
+#define EXT_BAT_VOLT_DIV_FACTOR 10
 #define INT_BAT_VOLT_DIV_FACTOR 1
 #define ADC_N_READINGS 10
 #define ADC_READING_DELAY 1
@@ -155,7 +155,7 @@ detectan cambios en el índice.
 */
 const float minPwmVals[21] = {0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15, 1.20, 1.25, 1.30, 1.35, 1.40, 1.45, 1.50};
 const float maxPwmVals[21] = {1.50, 1.55, 1.60, 1.65, 1.70, 1.75, 1.80, 1.85, 1.90, 1.95, 2.00, 2.05, 2.10, 2.15, 2.20, 2.25, 2.30, 2.35, 2.40, 2.45, 2.50};
-const float currentOffsetVals[21] = {-0.050, -0.045, -0.040, -0.035, -0.030, -0.025, -0.020, -0.015, -0.010, -0.005, 0.000, 0.005, 0.010, 0.015, 0.020, 0.025, 0.030, 0.035, 0.040, 0.045, 0.050};
+const float currentOffsetVals[21] = {-0.100, -0.095, -0.090, -0.085, -0.080, -0.075, -0.070, -0.065, -0.060, -0.055, -0.050, -0.045, -0.040, -0.035, -0.030, -0.025, -0.020, -0.015, -0.010, -0.005, -0.000};
 
 //* Variables globales
 bool qrIsVisible = true;
@@ -210,7 +210,7 @@ void saveDataToSD();
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels);
 void createDir(fs::FS &fs, const char * path);
 void removeDir(fs::FS &fs, const char * path);
-void readFile(fs::FS &fs, const char * path);
+String readFile(fs::FS &fs, const char * path);
 void writeFile(fs::FS &fs, const char * path, const char * message);
 void appendFile(fs::FS &fs, const char * path, const char * message);
 void renameFile(fs::FS &fs, const char * path1, const char * path2);
