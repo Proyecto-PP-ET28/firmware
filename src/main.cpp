@@ -229,6 +229,23 @@ void IRAM_ATTR Ext_INT3_ISR() {
   motorPWM = 0;
 }
 
+void IRAM_ATTR Ext_INT4_ISR() {
+  PeriodBetweenPulses = micros() - LastTimeWeMeasured;
+  LastTimeWeMeasured = micros();
+
+  if (PulseCounter >= AmountOfReadings) {
+    PeriodAverage = PeriodSum / AmountOfReadings;
+    PulseCounter = 1;
+    PeriodSum = PeriodBetweenPulses;
+    int RemapedAmountOfReadings = map(PeriodBetweenPulses, 40000, 5000, 1, 10);
+    RemapedAmountOfReadings = constrain(RemapedAmountOfReadings, 1, 10);
+    AmountOfReadings = RemapedAmountOfReadings;
+  } else {
+    PulseCounter++;
+    PeriodSum = PeriodSum + PeriodBetweenPulses;
+  }
+}
+
 //! -------------------------------------------------------------------------- !//
 //!                                    MAIN                                    !//
 //! -------------------------------------------------------------------------- !//
@@ -273,18 +290,19 @@ void setup() {
   attachInterrupt(EN_DT, Ext_INT1_ISR, CHANGE);
   attachInterrupt(EN_SW, Ext_INT2_ISR, CHANGE);
   attachInterrupt(STOP_BTN, Ext_INT3_ISR, RISING);
-  // attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT4_ISR, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
-  delay(1000);  // We sometimes take several readings of the period to average. Since we don't have any readings
-                // stored we need a high enough value in micros() so if divided is not going to give negative values.
-                // The delay allows the micros() to be high enough for the first few cycles.
+  attachInterrupt(digitalPinToInterrupt(IR_SENSOR), Ext_INT4_ISR, RISING);
+  delay(1000);
 }
 
 void loop() {
   ArduinoOTA.handle();
   ws.cleanupClients();
   ESC.write(motorPWM);
+  readTachometer();
   readThrust();
   readADCs();
+
+  Serial.println(RPM);
 
   if (triggerSnap) {
     triggerSnap = false;
@@ -318,20 +336,6 @@ void loop() {
   if (RPM > RPMMax) RPMMax = RPM;
   if (extBatVolt > extBatVoltMax) extBatVoltMax = extBatVolt;
   if (extBatAmp > extBatAmpMax) extBatAmpMax = extBatAmp;
-
-  currentState = digitalRead(dataIN);
-  if (prevState != currentState) {
-    if (currentState == HIGH) {
-      duration = (micros() - prevMillis);
-      RPM = (60000000 / duration);
-      prevMillis = micros();
-    }
-  }
-  prevState = currentState;
-
-  if ((millis() - refresh) >= 100) {
-    Serial.println(RPM);
-  }
 
   batteryLevel = intBatVolt;
   if (!qrIsVisible) {
@@ -409,8 +413,7 @@ void initLoadCellCalibration() {
   u8g2.println("resultado / p. conocido");
   u8g2.sendBuffer();
 
-  while (true)
-    ;
+  while (true);
 }
 
 void initFS() {
@@ -1045,6 +1048,48 @@ void readThrust() {
       if (debug) Serial.println("HX711 not found");
     }
   }
+}
+
+void readTachometer() {
+  LastTimeCycleMeasure = LastTimeWeMeasured;
+  CurrentMicros = micros();
+  if (CurrentMicros < LastTimeCycleMeasure) {
+    LastTimeCycleMeasure = CurrentMicros;
+  }
+
+  FrequencyRaw = 10000000000 / PeriodAverage;
+  if (PeriodBetweenPulses > ZeroTimeout - ZeroDebouncingExtra || CurrentMicros - LastTimeCycleMeasure > ZeroTimeout - ZeroDebouncingExtra) {  // If the pulses are too far apart that we reached the timeout for zero:
+    FrequencyRaw = 0;                                                                                                                         // Set frequency as 0.
+    ZeroDebouncingExtra = 2000;                                                                                                               // Change the threshold a little so it doesn't bounce.
+  } else {
+    ZeroDebouncingExtra = 0;
+  }
+
+  FrequencyReal = FrequencyRaw / 10000;
+  rawRPM = FrequencyRaw / PulsesPerRevolution * 60;
+  rawRPM = rawRPM / 10000;
+  total = total - readings[readIndex];
+  readings[readIndex] = rawRPM;
+  total = total + readings[readIndex];
+  readIndex = readIndex + 1;
+
+  if (readIndex >= numReadings) {
+    readIndex = 0;
+  }
+
+  average = total / numReadings;
+  RPM = average / bladesNum;
+
+  // Serial.print("Per: ");  // Period
+  // Serial.print(PeriodBetweenPulses);
+  // Serial.print("\tRea: ");  // tReadings
+  // Serial.print(AmountOfReadings);
+  // Serial.print("\tFre: ");  // tFrequency
+  // Serial.print(FrequencyReal);
+  // Serial.print("\tRPM: ");  // tRPM
+  // Serial.print(RPM / 2);
+  // Serial.print("\tTac: ");  // tTachometer
+  // Serial.println(average);
 }
 
 float mapFloat(float x, float inMin, float inMax, float outMin, float outMax) {
