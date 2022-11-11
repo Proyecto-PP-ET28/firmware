@@ -533,6 +533,13 @@ void initOTA() {
 }
 
 void initConfig() {
+  // config.putInt("bladesNum", bladesNum);
+  // config.putInt("minPwmIndex", minPwmIndex);
+  // config.putInt("maxPwmIndex", maxPwmIndex);
+  // config.putInt("currentIndex", currentOffsetIndex);
+  // config.putBool("displayPeek", displayPeek);
+  // config.putBool("displayRealTime", displayRealTime);
+
   bladesNum = config.getInt("bladesNum", bladesNum);
   menuItemValue[5] = String(bladesNum);
 
