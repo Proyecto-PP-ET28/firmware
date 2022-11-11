@@ -56,7 +56,7 @@ String checkGlyph = "#";
 //* Celda de carga (LOAD)
 #define LOAD_SCK 0
 #define LOAD_DT 4
-#define LOAD_CAL_VALUE 240
+#define LOAD_CAL_VALUE 162 
 #define THRUST_READING_DELAY 200
 unsigned long trustLastMillis = 0;
 int thrust = 0;
@@ -83,7 +83,7 @@ int motorPWM = 0;
 #define CURRENT_SENSOR 34
 #define EXT_BAT_VOLT_DIV_FACTOR 10
 #define INT_BAT_VOLT_DIV_FACTOR 1
-#define ADC_N_READINGS 10
+#define ADC_N_READINGS 20
 #define ADC_READING_DELAY 1
 #define ADC_MAP_IN_MIN 0.02
 #define ADC_MAP_IN_MAX 2.60
