@@ -44,8 +44,8 @@ export default class UI {
     document.getElementById('blades-num').value = settingsArray[0];
     document.getElementById('display-real-time').checked = JSON.parse(settingsArray[1]);
     document.getElementById('display-peak').checked = JSON.parse(settingsArray[2]);
-    document.getElementById('pwm-min').value = parseFloat(settingsArray[3], 10).toFixed(2);
-    document.getElementById('pwm-max').value = parseFloat(settingsArray[4], 10).toFixed(2);
+    document.getElementById('pwm-min').value = settingsArray[3];
+    document.getElementById('pwm-max').value = settingsArray[4];
     document.getElementById('current-offset').value = parseFloat(settingsArray[5], 10).toFixed(3);
   }
 }

@@ -37,15 +37,23 @@ void IRAM_ATTR Ext_INT1_ISR() {  // Rotación del encoder
 
             //* PWM min
           case 6:
-            if (minPwmIndex > 0) {
-              minPwmIndex--;
+            // if (minPwmIndex > 0) {
+            //   minPwmIndex--;
+            // }
+            if (minPwmUs > 44) {
+              minPwmUs -= 15;
+              menuItemValue[currentMenuIndex] = String(minPwmUs);
             }
             break;
 
             //* PWM max
           case 7:
-            if (maxPwmIndex > 0) {
-              maxPwmIndex--;
+            // if (maxPwmIndex > 0) {
+            //   maxPwmIndex--;
+            // }
+            if (maxPwmUs > 1900) {
+              maxPwmUs -= 15;
+              menuItemValue[currentMenuIndex] = String(maxPwmUs);
             }
             break;
 
@@ -84,15 +92,23 @@ void IRAM_ATTR Ext_INT1_ISR() {  // Rotación del encoder
 
             //* PWM min
           case 6:
-            if (minPwmIndex < 20) {
-              minPwmIndex++;
+            // if (minPwmIndex < 20) {
+            //   minPwmIndex++;
+            // }
+            if (minPwmUs < 1044) {
+              minPwmUs += 15;
+              menuItemValue[currentMenuIndex] = String(minPwmUs);
             }
             break;
 
             //* PWM max
           case 7:
-            if (maxPwmIndex < 20) {
-              maxPwmIndex++;
+            // if (maxPwmIndex < 20) {
+            //   maxPwmIndex++;
+            // }
+            if (maxPwmUs < 2900) {
+              maxPwmUs += 15;
+              menuItemValue[currentMenuIndex] = String(maxPwmUs);
             }
             break;
 
@@ -174,7 +190,8 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Botón del encoder
       case 6:
         isEditingValue = !isEditingValue;
         if (!isEditingValue) {
-          config.putInt("minPwmIndex", minPwmIndex);
+          // config.putInt("minPwmIndex", minPwmIndex);
+          config.putInt("minPwmUs", minPwmUs);
         }
         break;
 
@@ -182,7 +199,8 @@ void IRAM_ATTR Ext_INT2_ISR() {  // Botón del encoder
       case 7:
         isEditingValue = !isEditingValue;
         if (!isEditingValue) {
-          config.putInt("maxPwmIndex", maxPwmIndex);
+          // config.putInt("maxPwmIndex", maxPwmIndex);
+          config.putInt("maxPwmUs", maxPwmUs);
         }
         break;
 
@@ -265,7 +283,7 @@ void setup() {
   Serial.begin(115200);
   config.begin("config", false);
   u8g2.begin();
-  ESC.attach(ESC_PWM);
+  ESC.attach(ESC_PWM, minPwmUs, maxPwmUs);
   Encoder.begin();
   oledInitScreen();
   // initLoadCellCalibration();  // Calibración de la celda de carga
@@ -314,17 +332,17 @@ void loop() {
     Load.tare();
   }
 
-  if (minPwmIndex != lastMinPwmIndex) {
-    lastMinPwmIndex = minPwmIndex;
-    minPwmMs = minPwmVals[minPwmIndex];
-    menuItemValue[6] = String(minPwmMs);
-  }
+  // if (minPwmIndex != lastMinPwmIndex) {
+  //   lastMinPwmIndex = minPwmIndex;
+  //   minPwmMs = minPwmVals[minPwmIndex];
+  //   menuItemValue[6] = String(minPwmMs);
+  // }
 
-  if (maxPwmIndex != lastMaxPwmIndex) {
-    lastMaxPwmIndex = maxPwmIndex;
-    maxPwmMs = maxPwmVals[maxPwmIndex];
-    menuItemValue[7] = String(maxPwmMs);
-  }
+  // if (maxPwmIndex != lastMaxPwmIndex) {
+  //   lastMaxPwmIndex = maxPwmIndex;
+  //   maxPwmMs = maxPwmVals[maxPwmIndex];
+  //   menuItemValue[7] = String(maxPwmMs);
+  // }
 
   if (currentOffsetIndex != lastCurrentOffsetIndex) {
     lastCurrentOffsetIndex = currentOffsetIndex;
@@ -413,7 +431,8 @@ void initLoadCellCalibration() {
   u8g2.println("resultado / p. conocido");
   u8g2.sendBuffer();
 
-  while (true);
+  while (true)
+    ;
 }
 
 void initFS() {
@@ -495,7 +514,7 @@ void initServer() {
     request->send_P(200, "text/plain", readFile(SD, "/data.txt").c_str());
   });
   server.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/plain", String(String(bladesNum) + "," + String(displayRealTime) + "," + String(displayPeek) + "," + String(minPwmMs) + "," + String(maxPwmMs) + "," + String(currentOffset, 3)).c_str());
+    request->send_P(200, "text/plain", String(String(bladesNum) + "," + String(displayRealTime) + "," + String(displayPeek) + "," + String(minPwmUs) + "," + String(maxPwmUs) + "," + String(currentOffset, 3)).c_str());
   });
   server.serveStatic("/", SPIFFS, "/");
   server.begin();
@@ -539,6 +558,8 @@ void initConfig() {
   // config.putInt("bladesNum", bladesNum);
   // config.putInt("minPwmIndex", minPwmIndex);
   // config.putInt("maxPwmIndex", maxPwmIndex);
+  // config.putInt("minPwmUs", minPwmUs);
+  // config.putInt("maxPwmUs", maxPwmUs);
   // config.putInt("currentIndex", currentOffsetIndex);
   // config.putBool("displayPeek", displayPeek);
   // config.putBool("displayRealTime", displayRealTime);
@@ -546,17 +567,23 @@ void initConfig() {
   bladesNum = config.getInt("bladesNum", bladesNum);
   menuItemValue[5] = String(bladesNum);
 
-  const int minIndex = config.getInt("minPwmIndex", minPwmIndex);
-  minPwmIndex = minIndex;
-  lastMinPwmIndex = minIndex;
-  minPwmMs = minPwmVals[minIndex];
-  menuItemValue[6] = String(minPwmMs);
+  // const int minIndex = config.getInt("minPwmIndex", minPwmIndex);
+  // minPwmIndex = minIndex;
+  // lastMinPwmIndex = minIndex;
+  // minPwmMs = minPwmVals[minIndex];
+  // menuItemValue[6] = String(minPwmMs);
 
-  const int maxIndex = config.getInt("maxPwmIndex", maxPwmIndex);
-  maxPwmIndex = maxIndex;
-  lastMaxPwmIndex = maxIndex;
-  maxPwmMs = maxPwmVals[maxIndex];
-  menuItemValue[7] = String(maxPwmMs);
+  // const int maxIndex = config.getInt("maxPwmIndex", maxPwmIndex);
+  // maxPwmIndex = maxIndex;
+  // lastMaxPwmIndex = maxIndex;
+  // maxPwmMs = maxPwmVals[maxIndex];
+  // menuItemValue[7] = String(maxPwmMs);
+
+  const int minIndex = config.getInt("minPwmUs", minPwmUs);
+  menuItemValue[6] = String(minPwmUs);
+
+  const int maxIndex = config.getInt("maxPwmUs", maxPwmUs);
+  menuItemValue[7] = String(maxPwmUs);
 
   const int offsetIndex = config.getInt("currentIndex", currentOffsetIndex);
   currentOffsetIndex = offsetIndex;
@@ -695,17 +722,23 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     }
     if (message.indexOf("SAVE_PWM_MIN") >= 0) {
       message.remove(0, String("SAVE_PWM_MIN").length() + 1);
-      minPwmIndex = round((message.toFloat() - 0.5) / 0.05);
-      minPwmMs = minPwmVals[minPwmIndex];
-      menuItemValue[6] = String(minPwmMs);
-      config.putInt("pwmMinIndex", minPwmIndex);
+      // minPwmIndex = round((message.toFloat() - 0.5) / 0.05);
+      // minPwmMs = minPwmVals[minPwmIndex];
+      // menuItemValue[6] = String(minPwmMs);
+      // config.putInt("pwmMinIndex", minPwmIndex);
+      minPwmUs = message.toInt();
+      config.putInt("minPwmUs", minPwmUs);
+      menuItemValue[6] = String(minPwmUs);
     }
     if (message.indexOf("SAVE_PWM_MAX") >= 0) {
       message.remove(0, String("SAVE_PWM_MAX").length() + 1);
-      maxPwmIndex = round((message.toFloat() - 1.5) / 0.05);
-      maxPwmMs = maxPwmVals[maxPwmIndex];
-      menuItemValue[7] = String(maxPwmMs);
-      config.putInt("pwmMinIndex", maxPwmIndex);
+      // maxPwmIndex = round((message.toFloat() - 1.5) / 0.05);
+      // maxPwmMs = maxPwmVals[maxPwmIndex];
+      // menuItemValue[7] = String(maxPwmMs);
+      // config.putInt("pwmMinIndex", maxPwmIndex);
+      maxPwmUs = message.toInt();
+      config.putInt("maxPwmUs", maxPwmUs);
+      menuItemValue[7] = String(maxPwmUs);
     }
     if (message.indexOf("SAVE_CURRENT_OFFSET") >= 0) {
       message.remove(0, String("SAVE_CURRENT_OFFSET").length() + 1);

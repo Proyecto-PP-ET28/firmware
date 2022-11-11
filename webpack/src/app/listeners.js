@@ -218,24 +218,41 @@ export default class BindEvent {
 
   static settingsBtns(target) {
     const input = document.getElementById(target);
-    const min = parseFloat(input.getAttribute('min'), 10);
-    const max = parseFloat(input.getAttribute('max'), 10);
-    const step = parseFloat(input.getAttribute('step'), 10);
+    let min, max, step;
+    if (target === 'current-offset') {
+      min = parseFloat(input.getAttribute('min'), 10);
+      max = parseFloat(input.getAttribute('max'), 10);
+      step = parseFloat(input.getAttribute('step'), 10);
+    } else {
+      min = parseInt(input.getAttribute('min'), 10);
+      max = parseInt(input.getAttribute('max'), 10);
+      step = parseInt(input.getAttribute('step'), 10);
+    }
     document
       .getElementById(`${target}-decrease`)
       .addEventListener('click', () => {
-        let inputValue = parseFloat(input.value, 10);
+        let inputValue;
+        if (target === 'current-offset') {
+          inputValue = parseFloat(input.value, 10);
+        } else {
+          inputValue = parseInt(input.value, 10);
+        }
         inputValue -= step;
         if (inputValue < min) inputValue = min;
-        input.value = inputValue.toFixed(target === 'current-offset' ? 3 : 2);
+        input.value = inputValue.toFixed(target === 'current-offset' ? 3 : 0);
       });
     document
       .getElementById(`${target}-increase`)
       .addEventListener('click', () => {
-        let inputValue = parseFloat(input.value, 10);
+        let inputValue;
+        if (target === 'current-offset') {
+          inputValue = parseFloat(input.value, 10);
+        } else {
+          inputValue = parseInt(input.value, 10);
+        }
         inputValue += step;
         if (inputValue > max) inputValue = max;
-        input.value = inputValue.toFixed(target === 'current-offset' ? 3 : 2);
+        input.value = inputValue.toFixed(target === 'current-offset' ? 3 : 0);
       });
   }
 }
