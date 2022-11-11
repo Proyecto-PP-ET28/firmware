@@ -4,9 +4,9 @@ import UI from './UI';
 import v from './variables';
 import s from './states';
 
-const measurementUpdateInterval = 100;
-export const pwmUpdateInterval = 20;
-const batteryUpdateInterval = 1000;
+const measurementUpdateInterval = 400;
+export const pwmUpdateInterval = 50;
+const batteryUpdateInterval = 2000;
 let dev = false;
 
 export default class Update {

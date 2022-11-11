@@ -1,15 +1,18 @@
 {
   "cSpell.words": [
-    "ledc",
-    "xhttp",
-    "ssid",
     "esima",
-    "mdns",
     "iram",
-    "xbmp"
+    "ledc",
+    "mdns",
+    "Remaped",
+    "ssid",
+    "xbmp",
+    "xhttp"
   ],
   "cSpell.language": "en,es-ES",
   "files.associations": {
-    "string": "cpp"
+    "*.ejs": "html",
+    "string": "cpp",
+    "bitset": "cpp"
   }
 }

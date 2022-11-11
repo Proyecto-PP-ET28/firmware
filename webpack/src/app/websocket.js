@@ -88,6 +88,19 @@ export default class WS {
     xhttp.send();
   }
 
+  // static getSavedData(target) {
+  //   const xhttp = new XMLHttpRequest();
+  //   xhttp.onreadystatechange = function () {
+  //     if (this.readyState == 4 && this.status == 200) {
+  //       v.savedData = JSON.parse(`[${this.responseText.replaceAll('###', ',')}}]`);
+  //       console.log(v.savedData);
+  //       UI.changeMenu(target);
+  //     }
+  //   };
+  //   xhttp.open('GET', '/saved', true);
+  //   xhttp.send();
+  // }
+
   static getBattery() {
     const xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function () {

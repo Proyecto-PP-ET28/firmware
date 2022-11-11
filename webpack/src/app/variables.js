@@ -9,5 +9,6 @@ export default {
   rpmMax: 0,
   voltMax: 0,
   ampMax: 0,
-  lastSettingsArray: []
+  lastSettingsArray: [],
+  savedData: []
 };

@@ -9,7 +9,7 @@ const webpack = require('webpack');
 module.exports = merge(common, {
   mode: 'production',
   output: {
-    filename: 'bundle-[hash].js',
+    filename: '[name].bundle.js',
     path: path.resolve(__dirname, '../data'),
     assetModuleFilename: 'images/[name].[ext]',
   },
@@ -24,6 +24,9 @@ module.exports = merge(common, {
         },
       }),
     ],
+    splitChunks: {
+      chunks: 'all',
+    },
   },
   plugins: [
     new MiniCssExtractPlugin({ filename: '[name]-[hash].css' }),
